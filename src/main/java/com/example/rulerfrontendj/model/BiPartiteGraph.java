@@ -26,7 +26,20 @@ public class BiPartiteGraph {
         private int visualWeight;
         private double percentage;
 
-        public BiPartiteLink() {}
+//        public BiPartiteLink() {}
+
+        public BiPartiteLink(String leftBin, String rightBin, int weight, double percentage, int maxWeight) {
+            this.leftBin = leftBin;
+            this.rightBin = rightBin;
+            this.weight = weight;
+            this.percentage = percentage;
+
+            // 标准化权重：0-1范围
+            this.normalizedWeight = maxWeight > 0 ? (double) weight / maxWeight : 0.0;
+
+            // 视觉权重：1-10范围，便于前端设置线条粗细
+            this.visualWeight = Math.max(1, (int) Math.ceil(normalizedWeight * 10));
+        }
 
         // Getters and Setters
         public String getLeftBin() { return leftBin; }
@@ -50,7 +63,18 @@ public class BiPartiteGraph {
         private String leftBin;
         private String rightBin;
 
-        public ConnectionDetail() {}
+//        public ConnectionDetail() {}
+
+
+        // 添加这个构造函数
+        public ConnectionDetail(int rowIndex, String leftOriginalValue, String rightOriginalValue,
+                                String leftBin, String rightBin) {
+            this.rowIndex = rowIndex;
+            this.leftOriginalValue = leftOriginalValue;
+            this.rightOriginalValue = rightOriginalValue;
+            this.leftBin = leftBin;
+            this.rightBin = rightBin;
+        }
 
         // Getters and Setters
         public int getRowIndex() { return rowIndex; }
