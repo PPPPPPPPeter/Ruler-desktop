@@ -1,8 +1,8 @@
-package com.example.rulerfrontendj.service;
+package com.example.rulerDesktop.service;
 
-import com.example.rulerfrontendj.model.CsvData;
-import com.example.rulerfrontendj.model.BiPartiteGraph;
-import com.example.rulerfrontendj.model.Histogram;
+import com.example.rulerDesktop.model.CsvData;
+import com.example.rulerDesktop.model.BiPartiteGraph;
+import com.example.rulerDesktop.model.Histogram;
 
 import java.util.*;
 

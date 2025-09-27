@@ -1,4 +1,4 @@
-package com.example.rulerfrontendj.model;
+package com.example.rulerDesktop.model;
 
 public class DataPoint {
     private String value;

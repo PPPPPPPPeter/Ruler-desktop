@@ -1,5 +1,5 @@
 // HelloApplication.java
-package com.example.rulerfrontendj;
+package com.example.rulerDesktop;
 
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;

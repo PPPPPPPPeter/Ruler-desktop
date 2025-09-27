@@ -1,4 +1,4 @@
-package com.example.rulerfrontendj.model;
+package com.example.rulerDesktop.model;
 
 import java.util.List;
 import java.util.Map;

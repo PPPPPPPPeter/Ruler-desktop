@@ -16,6 +16,6 @@ module com.example.rulerfrontendj {
     requires okhttp3;
     requires com.fasterxml.jackson.datatype.jsr310;
 
-    opens com.example.rulerfrontendj to javafx.fxml;
-    exports com.example.rulerfrontendj;
+    opens com.example.rulerDesktop to javafx.fxml;
+    exports com.example.rulerDesktop;
 }

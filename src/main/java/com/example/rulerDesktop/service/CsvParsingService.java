@@ -1,12 +1,11 @@
-package com.example.rulerfrontendj.service;
+package com.example.rulerDesktop.service;
 
-import com.example.rulerfrontendj.model.CsvData;
-import com.example.rulerfrontendj.model.DataPoint;
+import com.example.rulerDesktop.model.CsvData;
+import com.example.rulerDesktop.model.DataPoint;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
 

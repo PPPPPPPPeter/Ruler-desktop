@@ -1,8 +1,8 @@
-package com.example.rulerfrontendj.service;
+package com.example.rulerDesktop.service;
 
-import com.example.rulerfrontendj.model.DataPoint;
-import com.example.rulerfrontendj.model.CsvData;
-import com.example.rulerfrontendj.model.Matrix;
+import com.example.rulerDesktop.model.DataPoint;
+import com.example.rulerDesktop.model.CsvData;
+import com.example.rulerDesktop.model.Matrix;
 
 import java.util.*;
 import java.util.stream.Collectors;

@@ -1,4 +1,4 @@
-package com.example.rulerfrontendj.model;
+package com.example.rulerDesktop.model;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

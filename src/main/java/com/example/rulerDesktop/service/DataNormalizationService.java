@@ -1,4 +1,4 @@
-package com.example.rulerfrontendj.service;
+package com.example.rulerDesktop.service;
 import java.util.List;
 import java.util.regex.Pattern;
 

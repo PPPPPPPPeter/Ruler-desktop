@@ -1,14 +1,18 @@
-package com.example.rulerfrontendj;
+package com.example.rulerDesktop;
 
+import com.example.rulerDesktop.model.CsvData;
+import com.example.rulerDesktop.service.CsvParsingService;
 import javafx.animation.TranslateTransition;
-import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import javafx.util.Duration;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.util.ResourceBundle;
 
@@ -54,17 +58,45 @@ public class HelloController implements Initializable {
     private final double SIDEBAR_WIDTH = 500.0;
     private final Duration ANIMATION_DURATION = Duration.millis(300);
 
+    // 添加CSV解析服务
+    private final CsvParsingService csvParsingService = new CsvParsingService();
+    private CsvData currentCsvData; // 存储当前加载的CSV数据
+
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         setupSidebars();
     }
 
-
-    // 新增的按钮事件处理方法
+    // 实现CSV导入功能
     @FXML
     private void handleImportCsv() {
-        System.out.println("Import CSV button clicked");
-        // TODO: 实现CSV导入功能
+        // 创建文件选择器
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("选择CSV文件");
+
+        // 设置文件扩展名过滤器
+        FileChooser.ExtensionFilter csvFilter = new FileChooser.ExtensionFilter("CSV文件 (*.csv)", "*.csv");
+        fileChooser.getExtensionFilters().add(csvFilter);
+
+        // 显示文件选择对话框
+        File selectedFile = fileChooser.showOpenDialog(mainContainer.getScene().getWindow());
+
+        if (selectedFile != null) {
+            try {
+                // 使用CsvParsingService处理CSV文件
+                currentCsvData = csvParsingService.loadAndAnalyzeCsv(selectedFile);
+
+                // 输出处理完成信息到控制台
+                System.out.println(selectedFile.getName() + " 处理完成");
+
+            } catch (IOException e) {
+                System.err.println("CSV文件处理失败: " + e.getMessage());
+                e.printStackTrace();
+            } catch (Exception e) {
+                System.err.println("处理CSV文件时发生错误: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
     }
 
     @FXML
@@ -140,6 +172,4 @@ public class HelloController implements Initializable {
         transition.play();
         rightSidebarExpanded = !rightSidebarExpanded;
     }
-
-
 }
