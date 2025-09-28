@@ -102,7 +102,6 @@ public class HelloController implements Initializable {
         setupSidebars();
         setupCsvTable();
         setupTableResizing();
-//        setupSidebarResizing();
     }
 
     private void setupCsvTable() {
@@ -296,9 +295,6 @@ public class HelloController implements Initializable {
         // 初始化左侧边栏位置（隐藏状态）
         leftSidebar.setTranslateX(-leftSidebar.getPrefWidth());
 
-        // 初始化右侧边栏位置（隐藏状态）
-        rightSidebar.setTranslateX(rightSidebar.getPrefWidth());
-
         // 确保主内容区域初始状态正确
         updateMainContentAreaForLeftSidebar();
     }
@@ -315,17 +311,6 @@ public class HelloController implements Initializable {
         }
     }
 
-    @FXML
-    private void toggleRightSidebar() {
-        animateRightSidebar();
-    }
-
-    @FXML
-    private void closeRightSidebar() {
-        if (rightSidebarExpanded) {
-            animateRightSidebar();
-        }
-    }
 
     private void animateLeftSidebar() {
         TranslateTransition transition = new TranslateTransition(ANIMATION_DURATION, leftSidebar);
@@ -344,18 +329,4 @@ public class HelloController implements Initializable {
         leftSidebarExpanded = !leftSidebarExpanded;
     }
 
-    private void animateRightSidebar() {
-        TranslateTransition transition = new TranslateTransition(ANIMATION_DURATION, rightSidebar);
-
-        if (rightSidebarExpanded) {
-            // 收起右侧边栏
-            transition.setToX(rightSidebar.getPrefWidth());
-        } else {
-            // 展开右侧边栏
-            transition.setToX(0);
-        }
-
-        transition.play();
-        rightSidebarExpanded = !rightSidebarExpanded;
-    }
 }

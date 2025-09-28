@@ -44,12 +44,6 @@
                                 <Insets right="10.0" />
                             </HBox.margin>
                         </Button>
-
-                        <Button fx:id="rightToggleBtn" mnemonicParsing="false" onAction="#toggleRightSidebar" prefHeight="30.0" prefWidth="30.0" style="-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 16px;" text="◀">
-                            <HBox.margin>
-                                <Insets right="10.0" />
-                            </HBox.margin>
-                        </Button>
                     </children>
                 </HBox>
 
@@ -73,12 +67,9 @@
                                                 <Insets bottom="20.0" left="50.0" right="50.0" top="50.0" />
                                             </padding>
                                         </VBox>
-
                                         <!-- CSV表格区域 -->
                                         <VBox fx:id="csvTableContainer" prefHeight="190.0" style="-fx-background-color: white; -fx-border-color: #bdc3c7; -fx-border-width: 1 0 0 0;" visible="false" managed="false">
                                             <children>
-
-
                                                 <!-- 可拖拽的标题栏 -->
                                                 <HBox fx:id="csvTableHeader" alignment="CENTER_LEFT" prefHeight="30.0" style="-fx-background-color: #34495e; -fx-cursor: hand;">
                                                     <children>
@@ -89,15 +80,10 @@
                                                         </Label>
                                                     </children>
                                                 </HBox>
-
-
                                                 <!-- 表格内容区域 -->
                                                 <TableView fx:id="csvTableView" VBox.vgrow="ALWAYS" style="-fx-font-size: 12px;" />
                                             </children>
                                         </VBox>
-
-
-
                                     </children>
                                 </VBox>
                             </content>
@@ -133,48 +119,11 @@
                                         <Insets left="20.0" right="20.0" top="10.0" />
                                     </VBox.margin>
                                 </VBox>
-
-<!--                                &lt;!&ndash; 左侧边栏右边缘拖拽条 &ndash;&gt;-->
-<!--                                <Region fx:id="leftResizeHandle" prefWidth="5.0" style="-fx-background-color: transparent; -fx-cursor: e-resize;"-->
-<!--                                        AnchorPane.bottomAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />-->
-                            </children>
-                        </VBox>
-
-                        <!-- 右侧边栏 -->
-                        <VBox fx:id="rightSidebar" prefWidth="500.0" style="-fx-background-color: white;"
-                              AnchorPane.bottomAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                            <children>
-<!--                                &lt;!&ndash; 右侧边栏左边缘拖拽条 &ndash;&gt;-->
-<!--                                <Region fx:id="rightResizeHandle" prefWidth="5.0" style="-fx-background-color: transparent; -fx-cursor: w-resize;"-->
-<!--                                        AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.topAnchor="0.0" />-->
-
-                                <!-- 右侧边栏头部带关闭按钮 -->
-                                <HBox alignment="CENTER_LEFT" spacing="10.0">
-                                    <children>
-                                        <Button fx:id="rightCloseBtn" mnemonicParsing="false"
-                                                onAction="#closeRightSidebar" prefHeight="30.0"
-                                                prefWidth="30.0" style="-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 14px;" text="×">
-                                        </Button>
-                                    </children>
-                                    <VBox.margin>
-                                        <Insets bottom="10.0" left="20.0" right="20.0" top="20.0" />
-                                    </VBox.margin>
-                                </HBox>
-                                <Separator />
-
-                                <!-- 右侧边栏内容区域 -->
-                                <VBox spacing="10.0" VBox.vgrow="ALWAYS">
-                                    <children>
-                                        <!-- 这里可以添加你的右侧边栏内容 -->
-                                    </children>
-                                    <VBox.margin>
-                                        <Insets left="20.0" right="20.0" top="10.0" />
-                                    </VBox.margin>
-                                </VBox>
                             </children>
                         </VBox>
                     </children>
                 </AnchorPane>
+
 
                 <!-- Footer -->
                 <HBox alignment="CENTER" prefHeight="40.0" style="-fx-background-color: #34495e;" VBox.vgrow="NEVER">
@@ -186,6 +135,8 @@
                         </Label>
                     </children>
                 </HBox>
+
+
             </children>
         </VBox>
     </children>
