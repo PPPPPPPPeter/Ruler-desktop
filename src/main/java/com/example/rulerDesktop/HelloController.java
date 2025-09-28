@@ -371,11 +371,11 @@ public class HelloController implements Initializable {
                         gc.setFill(Color.BLACK); // 浅色背景用黑字
                     }
 
-                    gc.setFont(javafx.scene.text.Font.font(Math.min(cellSize/3, 12)));
+                    gc.setFont(javafx.scene.text.Font.font(Math.min(cellSize / 3, 12)));
 
                     // 计算文字居中位置
                     String text = String.valueOf(value);
-                    double textWidth = text.length() * (cellSize/6);
+                    double textWidth = text.length() * (cellSize / 6);
                     double textX = x + (cellSize - textWidth) / 2;
                     double textY = y + cellSize / 2 + 3;
 
@@ -401,7 +401,7 @@ public class HelloController implements Initializable {
 
         // 显示提示文字
         gc.setFill(Color.GRAY);
-        gc.fillText("No Matrix Data", MATRIX_SIZE/2 - 30, MATRIX_SIZE/2);
+        gc.fillText("No Matrix Data", MATRIX_SIZE / 2 - 30, MATRIX_SIZE / 2);
     }
 
     // 新增：更新Matrix信息显示
@@ -703,4 +703,6 @@ public class HelloController implements Initializable {
         transition.play();
         leftSidebarExpanded = !leftSidebarExpanded;
     }
+
 }
+
