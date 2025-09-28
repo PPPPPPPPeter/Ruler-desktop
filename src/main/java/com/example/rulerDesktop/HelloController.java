@@ -11,6 +11,7 @@ import javafx.fxml.Initializable;
 import javafx.scene.control.*;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.util.Duration;
@@ -95,11 +96,13 @@ public class HelloController implements Initializable {
     private double dragStartY = 0;
     private double initialHeight = 190.0;
 
+
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         setupSidebars();
         setupCsvTable();
         setupTableResizing();
+//        setupSidebarResizing();
     }
 
     private void setupCsvTable() {
@@ -127,6 +130,18 @@ public class HelloController implements Initializable {
         csvTableHeader.setOnMouseReleased(event -> {
             isDragging = false;
         });
+    }
+
+
+
+    private void updateMainContentAreaForLeftSidebar() {
+        if (leftSidebarExpanded) {
+            // 左侧边栏展开时，主内容区域左边距调整
+            AnchorPane.setLeftAnchor(mainScrollPane, leftSidebar.getPrefWidth());
+        } else {
+            // 左侧边栏收起时，主内容区域左边距为0
+            AnchorPane.setLeftAnchor(mainScrollPane, 0.0);
+        }
     }
 
     // 实现CSV导入功能
@@ -172,8 +187,6 @@ public class HelloController implements Initializable {
         }
 
         // 隐藏无数据提示，显示表格
-        // 禁用排序功能
-
         noDataLabel.setVisible(false);
         noDataLabel.setManaged(false);
         csvTableContainer.setVisible(true);
@@ -189,8 +202,10 @@ public class HelloController implements Initializable {
             String header = headers.get(colIndex);
 
             TableColumn<Map<String, String>, String> column = new TableColumn<>(header);
-            column.setPrefWidth(190.0);
-            column.setMinWidth(190.0);
+            column.setPrefWidth(330.0);
+            column.setMinWidth(330.0);
+
+            // 禁用排序功能
             column.setSortable(false);
 
             // 设置列标题样式（加粗）
@@ -237,24 +252,24 @@ public class HelloController implements Initializable {
     @FXML
     private void handleExportCsv() {
         if (currentCsvData == null) {
-            showAlert("提示", "没有可导出的CSV数据。请先导入CSV文件。");
+            showAlert("Alert", "No CSV data loaded. Click 'Import CSV' to load a file.");
             return;
         }
 
         FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("保存CSV文件");
+        fileChooser.setTitle("Save .CSV File");
         fileChooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("CSV文件 (*.csv)", "*.csv"));
+                new FileChooser.ExtensionFilter("CSV file (*.csv)", "*.csv"));
 
         File file = fileChooser.showSaveDialog(mainContainer.getScene().getWindow());
 
         if (file != null) {
             try {
                 csvParsingService.exportCsvData(currentCsvData, file);
-                System.out.println("CSV文件导出成功: " + file.getName());
+                System.out.println("CSV file export successful: " + file.getName());
             } catch (IOException e) {
-                System.err.println("CSV文件导出失败: " + e.getMessage());
-                showAlert("错误", "CSV文件导出失败: " + e.getMessage());
+                System.err.println("CSV file export failed: " + e.getMessage());
+                showAlert("Error", "CSV file export failed: " + e.getMessage());
             }
         }
     }
@@ -279,10 +294,13 @@ public class HelloController implements Initializable {
 
     private void setupSidebars() {
         // 初始化左侧边栏位置（隐藏状态）
-        leftSidebar.setTranslateX(-SIDEBAR_WIDTH);
+        leftSidebar.setTranslateX(-leftSidebar.getPrefWidth());
 
         // 初始化右侧边栏位置（隐藏状态）
-        rightSidebar.setTranslateX(SIDEBAR_WIDTH);
+        rightSidebar.setTranslateX(rightSidebar.getPrefWidth());
+
+        // 确保主内容区域初始状态正确
+        updateMainContentAreaForLeftSidebar();
     }
 
     @FXML
@@ -314,10 +332,12 @@ public class HelloController implements Initializable {
 
         if (leftSidebarExpanded) {
             // 收起左侧边栏
-            transition.setToX(-SIDEBAR_WIDTH);
+            transition.setToX(-leftSidebar.getPrefWidth());
+            transition.setOnFinished(e -> updateMainContentAreaForLeftSidebar());
         } else {
             // 展开左侧边栏
             transition.setToX(0);
+            transition.setOnFinished(e -> updateMainContentAreaForLeftSidebar());
         }
 
         transition.play();
@@ -329,7 +349,7 @@ public class HelloController implements Initializable {
 
         if (rightSidebarExpanded) {
             // 收起右侧边栏
-            transition.setToX(SIDEBAR_WIDTH);
+            transition.setToX(rightSidebar.getPrefWidth());
         } else {
             // 展开右侧边栏
             transition.setToX(0);
