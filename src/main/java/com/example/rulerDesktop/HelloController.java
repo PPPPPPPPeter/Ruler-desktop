@@ -201,8 +201,8 @@ public class HelloController implements Initializable {
             String header = headers.get(colIndex);
 
             TableColumn<Map<String, String>, String> column = new TableColumn<>(header);
-            column.setPrefWidth(330.0);
-            column.setMinWidth(330.0);
+            column.setPrefWidth(480.0);
+            column.setMinWidth(480.0);
 
             // 禁用排序功能
             column.setSortable(false);
