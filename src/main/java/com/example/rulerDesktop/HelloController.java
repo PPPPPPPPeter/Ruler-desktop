@@ -1,18 +1,23 @@
 package com.example.rulerDesktop;
 
 import com.example.rulerDesktop.model.CsvData;
+import com.example.rulerDesktop.model.Matrix;
 import com.example.rulerDesktop.service.CsvParsingService;
+import com.example.rulerDesktop.service.MatrixService;
 import javafx.animation.TranslateTransition;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
-import javafx.scene.layout.AnchorPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
+
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Line;
+import javafx.scene.shape.Rectangle;
 import javafx.stage.FileChooser;
 import javafx.util.Duration;
 
@@ -95,6 +100,10 @@ public class HelloController implements Initializable {
     private boolean isDragging = false;
     private double dragStartY = 0;
     private double initialHeight = 190.0;
+
+    private final MatrixService matrixService = new MatrixService();
+    private Map<String, Matrix> currentMatrices; // 存储当前的Matrix数据
+    private VBox matrixContainer; // Matrix组件的容器
 
 
     @Override
@@ -238,7 +247,10 @@ public class HelloController implements Initializable {
                 currentCsvData.getTotalRows(),
                 currentCsvData.getTotalColumns(),
                 fileName));
+
     }
+
+
 
     private void showAlert(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
@@ -276,6 +288,15 @@ public class HelloController implements Initializable {
     @FXML
     private void handleResetAll() {
         currentCsvData = null;
+
+        currentMatrices = null;
+
+        // 清理Matrix容器
+        if (matrixContainer != null) {
+            mainContentContainer.getChildren().remove(matrixContainer);
+            matrixContainer = null;
+        }
+
         csvTableView.getColumns().clear();
         csvTableView.getItems().clear();
 
@@ -328,5 +349,10 @@ public class HelloController implements Initializable {
         transition.play();
         leftSidebarExpanded = !leftSidebarExpanded;
     }
+
+    // 3. 添加生成Matrix组件的核心方法
+
+
+
 
 }
