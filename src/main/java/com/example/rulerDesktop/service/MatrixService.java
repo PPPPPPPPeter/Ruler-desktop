@@ -15,27 +15,35 @@ public class MatrixService {
 
     private final DataNormalizationService dataNormalizationService;
 
+    private final BinningService binningService; // 新增
+
     public MatrixService() {
+
         this.dataNormalizationService = new DataNormalizationService();
+        this.binningService = new BinningService(dataNormalizationService); // 新增
     }
 
     public MatrixService(DataNormalizationService dataNormalizationService) {
         this.dataNormalizationService = dataNormalizationService;
+        this.binningService = new BinningService(dataNormalizationService); // 新增
     }
 
     /**
      * 为指定列生成Matrix数据（指定分箱数量）
+     * 更新版本：使用BinningService
      */
     public Matrix generateSingleMatrix(CsvData csvData, String columnName, int binCount) {
         if (!csvData.getHeaders().contains(columnName)) {
             throw new IllegalArgumentException("列 '" + columnName + "' 不存在");
         }
-        if (binCount < 4 || binCount > 12) {
-            throw new IllegalArgumentException("分箱数量必须在4-12之间");
+        // 使用BinningService的范围
+        if (binCount < BinningService.MIN_BIN_COUNT || binCount > BinningService.MAX_BIN_COUNT) {
+            throw new IllegalArgumentException(
+                    String.format("分箱数量必须在%d-%d之间",
+                            BinningService.MIN_BIN_COUNT, BinningService.MAX_BIN_COUNT));
         }
 
         Matrix matrix = new Matrix();
-
         matrix.setColumnName(columnName);
         matrix.setBinCount(binCount);
 
@@ -59,27 +67,36 @@ public class MatrixService {
             return matrix; // 少于2行数据无法生成序列
         }
 
-        // 2. 进行等频分箱
-        BinningResult binningResult = performEqualFrequencyBinning(columnValues, dataPoints, binCount);
+        // 2. 使用BinningService进行分箱
+        BinningService.BinningResult binningResult = binningService.performBinning(
+                columnValues,
+                dataPoints,
+                binCount,
+                BinningService.BinningStrategy.AUTO // 使用自动策略
+        );
 
         // 3. 设置分箱数据
-        matrix.setValueToBinMapping(binningResult.valueToBinMapping);
-        matrix.setBinDetails(binningResult.binDetails);
-        matrix.setOrderedValues(new ArrayList<>(binningResult.binDetails.keySet()));
-        matrix.setActualBinCount(binningResult.binDetails.size());
+        matrix.setValueToBinMapping(binningResult.getValueToBinMapping());
+        matrix.setBinDetails(binningResult.getBinDetails());
+        matrix.setOrderedValues(binningResult.getOrderedBinLabels());
+        matrix.setActualBinCount(binningResult.getActualBinCount());
 
         // 4. 生成序列矩阵
-        generateSequenceMatrix(matrix, binningResult.binnedValues);
+        generateSequenceMatrix(matrix, binningResult.getBinnedValues());
 
         return matrix;
     }
 
     /**
      * 更新Matrix的分箱数量
+     * 更新版本：使用BinningService
      */
     public Matrix updateSingleMatrixBinCount(Matrix matrix, int newBinCount) {
-        if (newBinCount < 4 || newBinCount > 12) {
-            throw new IllegalArgumentException("分箱数量必须在4-12之间");
+        // 使用BinningService的范围
+        if (newBinCount < BinningService.MIN_BIN_COUNT || newBinCount > BinningService.MAX_BIN_COUNT) {
+            throw new IllegalArgumentException(
+                    String.format("分箱数量必须在%d-%d之间",
+                            BinningService.MIN_BIN_COUNT, BinningService.MAX_BIN_COUNT));
         }
         if (matrix.getOriginalValues() == null || matrix.getOriginalValues().isEmpty()) {
             throw new IllegalStateException("Matrix缺少原始值数据，无法重新分箱");
@@ -101,15 +118,20 @@ public class MatrixService {
         matrix.setBinCount(newBinCount);
         matrix.getBinDetails().clear();
 
-        BinningResult binningResult = performEqualFrequencyBinning(
-                matrix.getOriginalValues(), dataPoints, newBinCount);
+        // 使用BinningService进行分箱
+        BinningService.BinningResult binningResult = binningService.performBinning(
+                matrix.getOriginalValues(),
+                dataPoints,
+                newBinCount,
+                BinningService.BinningStrategy.AUTO
+        );
 
-        matrix.setValueToBinMapping(binningResult.valueToBinMapping);
-        matrix.setBinDetails(binningResult.binDetails);
-        matrix.setOrderedValues(new ArrayList<>(binningResult.binDetails.keySet()));
-        matrix.setActualBinCount(binningResult.binDetails.size());
+        matrix.setValueToBinMapping(binningResult.getValueToBinMapping());
+        matrix.setBinDetails(binningResult.getBinDetails());
+        matrix.setOrderedValues(binningResult.getOrderedBinLabels());
+        matrix.setActualBinCount(binningResult.getActualBinCount());
 
-        generateSequenceMatrix(matrix, binningResult.binnedValues);
+        generateSequenceMatrix(matrix, binningResult.getBinnedValues());
         return matrix;
     }
 
@@ -217,102 +239,6 @@ public class MatrixService {
         return stats;
     }
 
-    /**
-     * 分箱结果内部类
-     */
-    private static class BinningResult {
-        List<String> binnedValues = new ArrayList<>();
-        Map<String, String> valueToBinMapping = new HashMap<>();
-        Map<String, List<DataPoint>> binDetails = new LinkedHashMap<>();
-    }
-
-    /**
-     * 执行等频分箱
-     */
-    private BinningResult performEqualFrequencyBinning(
-            List<String> values, List<DataPoint> dataPoints, int binCount) {
-
-        BinningResult result = new BinningResult();
-
-        if (!dataNormalizationService.isNumericColumn(values)) {
-            // 非数值类型直接使用原值
-            for (int i = 0; i < values.size(); i++) {
-                String value = values.get(i);
-                result.binnedValues.add(value);
-                result.valueToBinMapping.put(value, value);
-                result.binDetails.computeIfAbsent(value, k -> new ArrayList<>()).add(dataPoints.get(i));
-            }
-            return result;
-        }
-
-        // 数值类型分箱逻辑
-        Map<String, Long> valueFrequency = values.stream()
-                .collect(Collectors.groupingBy(v -> v, LinkedHashMap::new, Collectors.counting()));
-
-        if (valueFrequency.size() <= binCount) {
-            // 不同值数量 <= 分箱数，直接使用原值
-            for (int i = 0; i < values.size(); i++) {
-                String value = values.get(i);
-                result.binnedValues.add(value);
-                result.valueToBinMapping.put(value, value);
-                result.binDetails.computeIfAbsent(value, k -> new ArrayList<>()).add(dataPoints.get(i));
-            }
-            return result;
-        }
-
-        // 等频分箱
-        List<String> sortedValues = valueFrequency.keySet().stream()
-                .filter(v -> !v.equals("<NULL>") && !v.equals("<EMPTY>"))
-                .sorted(dataNormalizationService::compareNumericValues)
-                .collect(Collectors.toList());
-
-        long totalFrequency = values.size();
-        long targetPerBin = totalFrequency / binCount;
-        long remainder = totalFrequency % binCount;
-
-        int currentBin = 0;
-        long currentFreq = 0;
-        long target = targetPerBin + (currentBin < remainder ? 1 : 0);
-        List<String> currentBinValues = new ArrayList<>();
-
-        for (int i = 0; i < sortedValues.size(); i++) {
-            String value = sortedValues.get(i);
-            currentBinValues.add(value);
-            currentFreq += valueFrequency.get(value);
-
-            boolean shouldFinish = (currentFreq >= target && currentBin < binCount - 1)
-                    || (i == sortedValues.size() - 1);
-
-            if (shouldFinish) {
-                String binLabel = dataNormalizationService.createNumericRangeLabel(currentBinValues);
-                for (String binValue : currentBinValues) {
-                    result.valueToBinMapping.put(binValue, binLabel);
-                }
-
-                if (i < sortedValues.size() - 1) {
-                    currentBin++;
-                    currentFreq = 0;
-                    target = targetPerBin + (currentBin < remainder ? 1 : 0);
-                    currentBinValues.clear();
-                }
-            }
-        }
-
-        // 处理NULL和EMPTY值
-        valueFrequency.keySet().stream()
-                .filter(v -> v.equals("<NULL>") || v.equals("<EMPTY>"))
-                .forEach(v -> result.valueToBinMapping.put(v, v));
-
-        // 映射原始值到分箱值并记录详情
-        for (int i = 0; i < values.size(); i++) {
-            String originalValue = values.get(i);
-            String binLabel = result.valueToBinMapping.get(originalValue);
-            result.binnedValues.add(binLabel);
-            result.binDetails.computeIfAbsent(binLabel, k -> new ArrayList<>()).add(dataPoints.get(i));
-        }
-
-        return result;
-    }
 
     /**
      * 生成序列矩阵

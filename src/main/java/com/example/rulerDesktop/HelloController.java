@@ -183,24 +183,24 @@ public class HelloController implements Initializable {
         controls.setAlignment(Pos.CENTER);
 
         Label binLabel = new Label("Bins:");
-        Spinner<Integer> binSpinner = new Spinner<>(4, 12, matrix.getActualBinCount());
-        binSpinner.setPrefWidth(50);
+        Spinner<Integer> binSpinner = new Spinner<>(1, 50, matrix.getBinCount());
+        binSpinner.setPrefWidth(57);
         binSpinner.setEditable(false);
 
-        // 检查是否为非数字类型，禁用Spinner
-        List<String> originalValues = matrix.getOriginalValues();
-        boolean isNonNumeric = false;
-        if (originalValues != null && !originalValues.isEmpty()) {
-            isNonNumeric = !new com.example.rulerDesktop.service.DataNormalizationService()
-                    .isNumericColumn(originalValues);
-        }
-
-        if (isNonNumeric) {
-            binSpinner.setDisable(true);
-            binLabel.setStyle("-fx-text-fill: #999;");
-            // 将Spinner的值设置为实际分箱数
-            binSpinner.getValueFactory().setValue(matrix.getActualBinCount());
-        }
+//        // 检查是否为非数字类型，禁用Spinner
+//        List<String> originalValues = matrix.getOriginalValues();
+//        boolean isNonNumeric = false;
+//        if (originalValues != null && !originalValues.isEmpty()) {
+//            isNonNumeric = !new com.example.rulerDesktop.service.DataNormalizationService()
+//                    .isNumericColumn(originalValues);
+//        }
+//
+//        if (isNonNumeric) {
+//            binSpinner.setDisable(true);
+//            binLabel.setStyle("-fx-text-fill: #999;");
+//            // 将Spinner的值设置为实际分箱数
+//            binSpinner.getValueFactory().setValue(matrix.getActualBinCount());
+//        }
 
         // 分箱数量变化监听（现在canvas已经声明了）
         binSpinner.valueProperty().addListener((obs, oldVal, newVal) -> {

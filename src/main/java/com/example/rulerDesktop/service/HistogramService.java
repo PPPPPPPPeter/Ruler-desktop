@@ -15,16 +15,23 @@ public class HistogramService {
 
     private final DataNormalizationService dataNormalizationService;
 
+    private final BinningService binningService; // 新增
+
     public HistogramService() {
+
         this.dataNormalizationService = new DataNormalizationService();
+        this.binningService = new BinningService(dataNormalizationService); // 新增
+
     }
 
     public HistogramService(DataNormalizationService dataNormalizationService) {
         this.dataNormalizationService = dataNormalizationService;
+        this.binningService = new BinningService(dataNormalizationService); // 新增
     }
 
     /**
      * 为指定列生成Histogram数据
+     * 更新版本：使用BinningService
      */
     public Histogram generateSingleHistogram(CsvData csvData, String columnName, int binCount) {
         if (csvData == null) {
@@ -33,12 +40,14 @@ public class HistogramService {
         if (!csvData.getHeaders().contains(columnName)) {
             throw new IllegalArgumentException("列 '" + columnName + "' 不存在");
         }
-        if (binCount < 4 || binCount > 12) {
-            throw new IllegalArgumentException("分箱数量必须在4-12之间");
+        // 使用BinningService的范围
+        if (binCount < BinningService.MIN_BIN_COUNT || binCount > BinningService.MAX_BIN_COUNT) {
+            throw new IllegalArgumentException(
+                    String.format("分箱数量必须在%d-%d之间",
+                            BinningService.MIN_BIN_COUNT, BinningService.MAX_BIN_COUNT));
         }
 
         Histogram histogram = new Histogram();
-
         histogram.setColumnName(columnName);
         histogram.setBinCount(binCount);
 
@@ -64,18 +73,23 @@ public class HistogramService {
             return histogram;
         }
 
-        // 执行分箱
-        BinningResult binningResult = performBinning(columnValues, dataPoints, binCount);
+        // 使用BinningService执行分箱
+        BinningService.BinningResult binningResult = binningService.performBinning(
+                columnValues,
+                dataPoints,
+                binCount,
+                BinningService.BinningStrategy.AUTO
+        );
 
         // 设置结果
-        histogram.setBinDetails(binningResult.binDetails);
-        histogram.setValueToBinMapping(binningResult.valueToBinMapping);
-        histogram.setOrderedValues(new ArrayList<>(binningResult.binDetails.keySet()));
-        histogram.setActualBinCount(binningResult.binDetails.size());
+        histogram.setBinDetails(binningResult.getBinDetails());
+        histogram.setValueToBinMapping(binningResult.getValueToBinMapping());
+        histogram.setOrderedValues(binningResult.getOrderedBinLabels());
+        histogram.setActualBinCount(binningResult.getActualBinCount());
 
         // 计算频次
         Map<String, Integer> frequency = new LinkedHashMap<>();
-        for (Map.Entry<String, List<DataPoint>> entry : binningResult.binDetails.entrySet()) {
+        for (Map.Entry<String, List<DataPoint>> entry : binningResult.getBinDetails().entrySet()) {
             frequency.put(entry.getKey(), entry.getValue().size());
         }
         histogram.setValueFrequency(frequency);
@@ -85,13 +99,17 @@ public class HistogramService {
 
     /**
      * 更新Histogram的分箱数量
+     * 更新版本：使用BinningService
      */
     public Histogram updateSingleHistogramBinCount(Histogram histogram, int newBinCount) {
         if (histogram == null) {
             throw new IllegalArgumentException("Histogram不能为空");
         }
-        if (newBinCount < 4 || newBinCount > 12) {
-            throw new IllegalArgumentException("分箱数量必须在4-12之间");
+        // 使用BinningService的范围
+        if (newBinCount < BinningService.MIN_BIN_COUNT || newBinCount > BinningService.MAX_BIN_COUNT) {
+            throw new IllegalArgumentException(
+                    String.format("分箱数量必须在%d-%d之间",
+                            BinningService.MIN_BIN_COUNT, BinningService.MAX_BIN_COUNT));
         }
         if (histogram.getOriginalValues() == null || histogram.getOriginalValues().isEmpty()) {
             throw new IllegalStateException("Histogram缺少原始值数据，无法重新分箱");
@@ -114,16 +132,22 @@ public class HistogramService {
         histogram.getBinDetails().clear();
         histogram.getValueToBinMapping().clear();
 
-        BinningResult binningResult = performBinning(histogram.getOriginalValues(), dataPoints, newBinCount);
+        // 使用BinningService执行分箱
+        BinningService.BinningResult binningResult = binningService.performBinning(
+                histogram.getOriginalValues(),
+                dataPoints,
+                newBinCount,
+                BinningService.BinningStrategy.AUTO
+        );
 
-        histogram.setBinDetails(binningResult.binDetails);
-        histogram.setValueToBinMapping(binningResult.valueToBinMapping);
-        histogram.setOrderedValues(new ArrayList<>(binningResult.binDetails.keySet()));
-        histogram.setActualBinCount(binningResult.binDetails.size());
+        histogram.setBinDetails(binningResult.getBinDetails());
+        histogram.setValueToBinMapping(binningResult.getValueToBinMapping());
+        histogram.setOrderedValues(binningResult.getOrderedBinLabels());
+        histogram.setActualBinCount(binningResult.getActualBinCount());
 
         // 重新计算频次
         Map<String, Integer> frequency = new LinkedHashMap<>();
-        for (Map.Entry<String, List<DataPoint>> entry : binningResult.binDetails.entrySet()) {
+        for (Map.Entry<String, List<DataPoint>> entry : binningResult.getBinDetails().entrySet()) {
             frequency.put(entry.getKey(), entry.getValue().size());
         }
         histogram.setValueFrequency(frequency);
@@ -327,89 +351,6 @@ public class HistogramService {
     private static class BinningResult {
         Map<String, List<DataPoint>> binDetails = new LinkedHashMap<>();
         Map<String, String> valueToBinMapping = new HashMap<>();
-    }
-
-    /**
-     * 执行分箱操作
-     */
-    private BinningResult performBinning(List<String> values, List<DataPoint> dataPoints, int binCount) {
-        BinningResult result = new BinningResult();
-
-        if (!dataNormalizationService.isNumericColumn(values)) {
-            // 非数值类型：直接使用原值
-            for (int i = 0; i < values.size(); i++) {
-                String value = values.get(i);
-                result.valueToBinMapping.put(value, value);
-                result.binDetails.computeIfAbsent(value, k -> new ArrayList<>()).add(dataPoints.get(i));
-            }
-            return result;
-        }
-
-        // 数值类型：等频分箱
-        Map<String, Long> valueFrequency = values.stream()
-                .collect(Collectors.groupingBy(v -> v, LinkedHashMap::new, Collectors.counting()));
-
-        if (valueFrequency.size() <= binCount) {
-            // 不同值数量 <= 分箱数：使用原值
-            for (int i = 0; i < values.size(); i++) {
-                String value = values.get(i);
-                result.valueToBinMapping.put(value, value);
-                result.binDetails.computeIfAbsent(value, k -> new ArrayList<>()).add(dataPoints.get(i));
-            }
-            return result;
-        }
-
-        // 执行等频分箱
-        List<String> sortedValues = valueFrequency.keySet().stream()
-                .filter(v -> !v.equals("<NULL>") && !v.equals("<EMPTY>"))
-                .sorted(dataNormalizationService::compareNumericValues)
-                .collect(Collectors.toList());
-
-        long totalFreq = values.size();
-        long targetPerBin = totalFreq / binCount;
-        long remainder = totalFreq % binCount;
-
-        int currentBin = 0;
-        long currentFreq = 0;
-        long target = targetPerBin + (currentBin < remainder ? 1 : 0);
-        List<String> currentBinValues = new ArrayList<>();
-
-        for (int i = 0; i < sortedValues.size(); i++) {
-            String value = sortedValues.get(i);
-            currentBinValues.add(value);
-            currentFreq += valueFrequency.get(value);
-
-            boolean shouldFinish = (currentFreq >= target && currentBin < binCount - 1)
-                    || (i == sortedValues.size() - 1);
-
-            if (shouldFinish) {
-                String binLabel = dataNormalizationService.createNumericRangeLabel(currentBinValues);
-                for (String binValue : currentBinValues) {
-                    result.valueToBinMapping.put(binValue, binLabel);
-                }
-
-                if (i < sortedValues.size() - 1) {
-                    currentBin++;
-                    currentFreq = 0;
-                    target = targetPerBin + (currentBin < remainder ? 1 : 0);
-                    currentBinValues.clear();
-                }
-            }
-        }
-
-        // 处理特殊值
-        valueFrequency.keySet().stream()
-                .filter(v -> v.equals("<NULL>") || v.equals("<EMPTY>"))
-                .forEach(v -> result.valueToBinMapping.put(v, v));
-
-        // 映射数据点到bin
-        for (int i = 0; i < values.size(); i++) {
-            String originalValue = values.get(i);
-            String binLabel = result.valueToBinMapping.get(originalValue);
-            result.binDetails.computeIfAbsent(binLabel, k -> new ArrayList<>()).add(dataPoints.get(i));
-        }
-
-        return result;
     }
 
     /**
