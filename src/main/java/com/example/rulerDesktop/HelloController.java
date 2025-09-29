@@ -10,16 +10,12 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-
 import javafx.geometry.Pos;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
-
 import javafx.scene.paint.Color;
-import javafx.scene.shape.Line;
-import javafx.scene.shape.Rectangle;
 import javafx.stage.FileChooser;
 import javafx.util.Duration;
 
@@ -87,27 +83,9 @@ public class HelloController implements Initializable {
     @FXML
     private Label noDataLabel;
 
-    // Matrix相关组件
+    // Matrix容器 - 放置在CSV表格上方
     @FXML
-    private ComboBox<String> matrixColumnComboBox;
-
-    @FXML
-    private Spinner<Integer> matrixBinSpinner;
-
-    @FXML
-    private Canvas matrixCanvas;
-
-    @FXML
-    private Label matrixInfoLabel;
-
-    @FXML
-    private Label matrixStatsLabel;
-
-    @FXML
-    private Button refreshMatrixBtn;
-
-    @FXML
-    private Button exportMatrixBtn;
+    private HBox matrixRowContainer;
 
     private boolean leftSidebarExpanded = false;
     private boolean rightSidebarExpanded = false;
@@ -127,12 +105,10 @@ public class HelloController implements Initializable {
 
     // Matrix相关服务和数据
     private final MatrixService matrixService = new MatrixService();
-    private Map<String, Matrix> currentMatrices; // 存储当前的Matrix数据
-    private VBox matrixContainer; // Matrix组件的容器
-    private Matrix currentMatrix; // 当前显示的Matrix
+    private Map<String, Matrix> currentMatrices; // 存储所有列的Matrix数据
 
     // Matrix渲染常量
-    private static final double MATRIX_SIZE = 250.0;
+    private static final double MATRIX_SIZE = 180.0;
     private static final Color MATRIX_GRID_COLOR = Color.LIGHTGRAY;
     private static final Color MATRIX_BACKGROUND_COLOR = Color.WHITE;
 
@@ -141,175 +117,123 @@ public class HelloController implements Initializable {
         setupSidebars();
         setupCsvTable();
         setupTableResizing();
-        setupMatrix();
     }
 
-    // 新增：初始化Matrix组件
-    private void setupMatrix() {
-        // 初始化Matrix相关组件
-        matrixColumnComboBox.setDisable(true);
-        matrixBinSpinner.setDisable(true);
-        refreshMatrixBtn.setDisable(true);
-        exportMatrixBtn.setDisable(true);
-
-        // 设置Spinner变化监听器
-        matrixBinSpinner.valueProperty().addListener((observable, oldValue, newValue) -> {
-            if (newValue != null && currentMatrix != null && !oldValue.equals(newValue)) {
-                handleMatrixBinChange();
-            }
-        });
-
-        // 设置Canvas鼠标事件
-        setupMatrixCanvasInteractions();
-
-        // 初始化Canvas
-        clearMatrixCanvas();
-    }
-
-    // 新增：设置Matrix Canvas交互
-    private void setupMatrixCanvasInteractions() {
-        matrixCanvas.setOnMouseMoved(event -> {
-            if (currentMatrix == null) return;
-
-            double x = event.getX();
-            double y = event.getY();
-
-            List<String> orderedValues = currentMatrix.getOrderedValues();
-            int binCount = orderedValues.size();
-
-            if (binCount > 0 && x >= 0 && y >= 0 && x < MATRIX_SIZE && y < MATRIX_SIZE) {
-                double cellSize = MATRIX_SIZE / binCount;
-                int col = (int) (x / cellSize);
-                int row = (int) (y / cellSize);
-
-                if (row < binCount && col < binCount) {
-                    int[][] matrixData = currentMatrix.getMatrix();
-                    int value = matrixData[row][col];
-                    String fromValue = orderedValues.get(row);
-                    String toValue = orderedValues.get(col);
-
-                    // 更新tooltip信息
-                    String tooltipText = String.format("From: %s → To: %s | Count: %d",
-                            fromValue, toValue, value);
-                    Tooltip tooltip = new Tooltip(tooltipText);
-                    Tooltip.install(matrixCanvas, tooltip);
-                }
-            }
-        });
-
-        matrixCanvas.setOnMouseClicked(event -> {
-            if (currentMatrix == null) return;
-
-            double x = event.getX();
-            double y = event.getY();
-
-            List<String> orderedValues = currentMatrix.getOrderedValues();
-            int binCount = orderedValues.size();
-
-            if (binCount > 0 && x >= 0 && y >= 0 && x < MATRIX_SIZE && y < MATRIX_SIZE) {
-                double cellSize = MATRIX_SIZE / binCount;
-                int col = (int) (x / cellSize);
-                int row = (int) (y / cellSize);
-
-                if (row < binCount && col < binCount) {
-                    int[][] matrixData = currentMatrix.getMatrix();
-                    int value = matrixData[row][col];
-                    String fromValue = orderedValues.get(row);
-                    String toValue = orderedValues.get(col);
-
-                    System.out.printf("Matrix cell clicked: [%d,%d] %s → %s (Count: %d)%n",
-                            row, col, fromValue, toValue, value);
-                }
-            }
-        });
-    }
-
-    // 新增：Matrix相关事件处理方法
-    @FXML
-    private void handleMatrixColumnChange() {
-        String selectedColumn = matrixColumnComboBox.getSelectionModel().getSelectedItem();
-        if (selectedColumn != null && currentCsvData != null) {
-            generateMatrix(selectedColumn, matrixBinSpinner.getValue());
-        }
-    }
-
-    @FXML
-    private void handleMatrixBinChange() {
-        String selectedColumn = matrixColumnComboBox.getSelectionModel().getSelectedItem();
-        if (selectedColumn != null && currentMatrix != null) {
-            int newBinCount = matrixBinSpinner.getValue();
-            try {
-                // 更新现有Matrix的分箱数量
-                currentMatrix = matrixService.updateSingleMatrixBinCount(currentMatrix, newBinCount);
-                renderMatrix();
-                updateMatrixInfo();
-                System.out.println("Matrix bins updated to: " + newBinCount);
-            } catch (Exception e) {
-                System.err.println("更新Matrix分箱时出错: " + e.getMessage());
-                showAlert("错误", "更新Matrix分箱失败: " + e.getMessage());
-            }
-        }
-    }
-
-    @FXML
-    private void handleRefreshMatrix() {
-        String selectedColumn = matrixColumnComboBox.getSelectionModel().getSelectedItem();
-        if (selectedColumn != null && currentCsvData != null) {
-            generateMatrix(selectedColumn, matrixBinSpinner.getValue());
-        }
-    }
-
-    @FXML
-    private void handleExportMatrix() {
-        if (currentMatrix == null) {
-            showAlert("提示", "没有可导出的Matrix数据");
+    // 为所有列生成Matrix并放置在CSV表格上方
+    private void generateAllMatrices() {
+        if (currentCsvData == null || currentCsvData.getHeaders().isEmpty()) {
             return;
         }
 
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("保存Matrix数据");
-        fileChooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("文本文件 (*.txt)", "*.txt"));
-
-        File file = fileChooser.showSaveDialog(mainContainer.getScene().getWindow());
-        if (file != null) {
-            try {
-                // 这里可以实现Matrix数据导出逻辑
-                matrixService.printMatrix(currentMatrix);
-                System.out.println("Matrix导出功能待实现");
-                showAlert("信息", "Matrix导出功能待实现");
-            } catch (Exception e) {
-                showAlert("错误", "导出失败: " + e.getMessage());
-            }
-        }
-    }
-
-    // 新增：生成Matrix数据
-    private void generateMatrix(String columnName, int binCount) {
         try {
-            currentMatrix = matrixService.generateSingleMatrix(currentCsvData, columnName, binCount);
-            renderMatrix();
-            updateMatrixInfo();
-            System.out.println("成功生成列 '" + columnName + "' 的Matrix");
+            // 使用MatrixService批量生成所有列的Matrix
+            currentMatrices = matrixService.generateAllMatrices(currentCsvData, 6); // 默认6个bins
+
+            // 清空并重新构建Matrix容器
+            matrixRowContainer.getChildren().clear();
+
+            // 为每一列创建Matrix组件
+            List<String> headers = currentCsvData.getHeaders();
+            for (String columnName : headers) {
+                Matrix matrix = currentMatrices.get(columnName);
+                if (matrix != null) {
+                    VBox matrixCell = createMatrixCell(matrix, columnName);
+                    matrixRowContainer.getChildren().add(matrixCell);
+                }
+            }
+
+            // 显示Matrix容器
+            matrixRowContainer.setVisible(true);
+            matrixRowContainer.setManaged(true);
+
+            System.out.println("成功为所有 " + headers.size() + " 列生成Matrix");
+
         } catch (Exception e) {
-            System.err.println("生成Matrix时出错: " + e.getMessage());
-            showAlert("错误", "生成Matrix失败: " + e.getMessage());
-            clearMatrixCanvas();
+            System.err.println("生成所有Matrix时出错: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
-    // 新增：渲染Matrix到Canvas
-    private void renderMatrix() {
-        if (currentMatrix == null) {
-            clearMatrixCanvas();
+    // 创建单个Matrix单元格组件
+    private VBox createMatrixCell(Matrix matrix, String columnName) {
+        VBox cell = new VBox(5);
+        cell.setPrefWidth(480.0);
+        cell.setMinWidth(480.0);
+        cell.setMaxWidth(480.0);
+        cell.setAlignment(Pos.TOP_CENTER);
+        cell.setStyle("-fx-padding: 5;");
+
+        // ===== 新增：添加列标题 =====
+        Label columnLabel = new Label(columnName);
+        columnLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        columnLabel.setAlignment(Pos.CENTER);
+        cell.getChildren().add(columnLabel);
+        // ===== 修改结束 =====
+
+        // 创建水平布局，将控制器放在Canvas左侧
+        HBox mainLayout = new HBox(10);
+        mainLayout.setAlignment(Pos.CENTER);
+
+        //创建Canvas
+        Canvas canvas = new Canvas(MATRIX_SIZE, MATRIX_SIZE);
+        renderMatrixToCanvas(canvas, matrix);
+
+        // 创建分箱控制器（垂直布局）
+        VBox controls = new VBox(5);
+        controls.setAlignment(Pos.CENTER);
+
+        Label binLabel = new Label("Bins:");
+        Spinner<Integer> binSpinner = new Spinner<>(4, 12, matrix.getActualBinCount());
+        binSpinner.setPrefWidth(50);
+        binSpinner.setEditable(false);
+
+        // 检查是否为非数字类型，禁用Spinner
+        List<String> originalValues = matrix.getOriginalValues();
+        boolean isNonNumeric = false;
+        if (originalValues != null && !originalValues.isEmpty()) {
+            isNonNumeric = !new com.example.rulerDesktop.service.DataNormalizationService()
+                    .isNumericColumn(originalValues);
+        }
+
+        if (isNonNumeric) {
+            binSpinner.setDisable(true);
+            binLabel.setStyle("-fx-text-fill: #999;");
+            // 将Spinner的值设置为实际分箱数
+            binSpinner.getValueFactory().setValue(matrix.getActualBinCount());
+        }
+
+        // 分箱数量变化监听（现在canvas已经声明了）
+        binSpinner.valueProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null && !newVal.equals(oldVal)) {
+                updateMatrixBinCount(columnName, newVal, canvas);
+            }
+        });
+
+        controls.getChildren().addAll(binLabel, binSpinner);
+
+        // 将控制器放在Canvas左侧
+        mainLayout.getChildren().addAll(controls, canvas);
+
+        // 将水平布局添加到单元格
+        cell.getChildren().add(mainLayout);
+
+        // 添加鼠标交互
+        setupCanvasInteraction(canvas, matrix);
+
+        return cell;
+    }
+
+    // 渲染Matrix到指定Canvas
+    private void renderMatrixToCanvas(Canvas canvas, Matrix matrix) {
+        if (matrix == null) {
             return;
         }
 
-        GraphicsContext gc = matrixCanvas.getGraphicsContext2D();
+        GraphicsContext gc = canvas.getGraphicsContext2D();
         gc.clearRect(0, 0, MATRIX_SIZE, MATRIX_SIZE);
 
-        List<String> orderedValues = currentMatrix.getOrderedValues();
-        int[][] matrixData = currentMatrix.getMatrix();
+        List<String> orderedValues = matrix.getOrderedValues();
+        int[][] matrixData = matrix.getMatrix();
         int binCount = orderedValues.size();
 
         if (binCount == 0) {
@@ -350,7 +274,7 @@ public class HelloController implements Initializable {
                 // 填充单元格
                 gc.fillRect(x, y, cellSize, cellSize);
 
-                // 为空单元格添加斜线标记（类似论文中的设计）
+                // 为空单元格添加斜线标记
                 if (value == 0 && cellSize > 10) {
                     gc.setStroke(Color.LIGHTGRAY);
                     gc.setLineWidth(1);
@@ -364,18 +288,17 @@ public class HelloController implements Initializable {
 
                 // 在较大的单元格中显示数值
                 if (cellSize > 25 && value > 0) {
-                    // 根据背景颜色选择文字颜色：深背景用白字，浅背景用黑字
+                    // 根据背景颜色选择文字颜色
                     if (intensity > 0.5) {
-                        gc.setFill(Color.WHITE); // 深色背景用白字
+                        gc.setFill(Color.WHITE);
                     } else {
-                        gc.setFill(Color.BLACK); // 浅色背景用黑字
+                        gc.setFill(Color.BLACK);
                     }
 
-                    gc.setFont(javafx.scene.text.Font.font(Math.min(cellSize / 3, 12)));
+                    gc.setFont(javafx.scene.text.Font.font(Math.min(cellSize/3, 12)));
 
-                    // 计算文字居中位置
                     String text = String.valueOf(value);
-                    double textWidth = text.length() * (cellSize / 6);
+                    double textWidth = text.length() * (cellSize/6);
                     double textX = x + (cellSize - textWidth) / 2;
                     double textY = y + cellSize / 2 + 3;
 
@@ -390,82 +313,77 @@ public class HelloController implements Initializable {
         gc.strokeRect(0, 0, MATRIX_SIZE, MATRIX_SIZE);
     }
 
-    // 新增：清空Matrix Canvas
-    private void clearMatrixCanvas() {
-        GraphicsContext gc = matrixCanvas.getGraphicsContext2D();
-        gc.setFill(MATRIX_BACKGROUND_COLOR);
-        gc.fillRect(0, 0, MATRIX_SIZE, MATRIX_SIZE);
-        gc.setStroke(MATRIX_GRID_COLOR);
-        gc.setLineWidth(1);
-        gc.strokeRect(0, 0, MATRIX_SIZE, MATRIX_SIZE);
-
-        // 显示提示文字
-        gc.setFill(Color.GRAY);
-        gc.fillText("No Matrix Data", MATRIX_SIZE / 2 - 30, MATRIX_SIZE / 2);
-    }
-
-    // 新增：更新Matrix信息显示
-    private void updateMatrixInfo() {
-        if (currentMatrix == null) {
-            matrixInfoLabel.setText("No matrix data");
-            matrixStatsLabel.setText("Statistics will appear here");
-            return;
+    // 更新Matrix的分箱数量
+    private void updateMatrixBinCount(String columnName, int newBinCount, Canvas canvas) {
+        try {
+            Matrix matrix = currentMatrices.get(columnName);
+            if (matrix != null) {
+                matrix = matrixService.updateSingleMatrixBinCount(matrix, newBinCount);
+                currentMatrices.put(columnName, matrix);
+                renderMatrixToCanvas(canvas, matrix);
+                setupCanvasInteraction(canvas, matrix);
+                System.out.println("列 '" + columnName + "' 的Matrix bins更新为: " + newBinCount);
+            }
+        } catch (Exception e) {
+            System.err.println("更新Matrix分箱时出错: " + e.getMessage());
         }
-
-        String info = String.format("Column: %s | Bins: %d/%d | Sequences: %d",
-                currentMatrix.getColumnName(),
-                currentMatrix.getActualBinCount(),
-                currentMatrix.getBinCount(),
-                currentMatrix.getTotalSequences());
-        matrixInfoLabel.setText(info);
-
-        // 获取统计信息
-        Map<String, Object> stats = matrixService.getMatrixStatistics(currentMatrix);
-        String statsText = String.format("Max Transition: %d | Self-transitions: %d (%.1f%%) | Sparsity: %.2f",
-                stats.getOrDefault("maxTransition", 0),
-                stats.getOrDefault("selfTransitions", 0),
-                (Double) stats.getOrDefault("selfTransitionRate", 0.0) * 100,
-                stats.getOrDefault("sparsity", 0.0));
-        matrixStatsLabel.setText(statsText);
     }
 
-    // 新增：初始化Matrix组件
-    private void initializeMatrixComponents() {
-        if (currentCsvData == null || currentCsvData.getHeaders().isEmpty()) {
-            return;
-        }
+    // 设置Canvas交互
+    private void setupCanvasInteraction(Canvas canvas, Matrix matrix) {
+        canvas.setOnMouseMoved(event -> {
+            if (matrix == null) return;
 
-        // 填充列选择下拉框
-        ObservableList<String> columns = FXCollections.observableArrayList(currentCsvData.getHeaders());
-        matrixColumnComboBox.setItems(columns);
+            double x = event.getX();
+            double y = event.getY();
 
-        // 默认选择第一列
-        matrixColumnComboBox.getSelectionModel().selectFirst();
+            List<String> orderedValues = matrix.getOrderedValues();
+            int binCount = orderedValues.size();
 
-        // 启用相关组件
-        matrixColumnComboBox.setDisable(false);
-        matrixBinSpinner.setDisable(false);
-        refreshMatrixBtn.setDisable(false);
-        exportMatrixBtn.setDisable(false);
+            if (binCount > 0 && x >= 0 && y >= 0 && x < MATRIX_SIZE && y < MATRIX_SIZE) {
+                double cellSize = MATRIX_SIZE / binCount;
+                int col = (int) (x / cellSize);
+                int row = (int) (y / cellSize);
 
-        // 生成第一列的Matrix
-        String firstColumn = currentCsvData.getHeaders().get(0);
-        generateMatrix(firstColumn, matrixBinSpinner.getValue());
-    }
+                if (row < binCount && col < binCount) {
+                    int[][] matrixData = matrix.getMatrix();
+                    int value = matrixData[row][col];
+                    String fromValue = orderedValues.get(row);
+                    String toValue = orderedValues.get(col);
 
-    // 新增：重置Matrix组件
-    private void resetMatrixComponents() {
-        matrixColumnComboBox.getItems().clear();
-        matrixColumnComboBox.setDisable(true);
-        matrixBinSpinner.setDisable(true);
-        refreshMatrixBtn.setDisable(true);
-        exportMatrixBtn.setDisable(true);
+                    String tooltipText = String.format("%s: %s → %s | Count: %d",
+                            matrix.getColumnName(), fromValue, toValue, value);
+                    Tooltip tooltip = new Tooltip(tooltipText);
+                    Tooltip.install(canvas, tooltip);
+                }
+            }
+        });
 
-        matrixInfoLabel.setText("No matrix data");
-        matrixStatsLabel.setText("Statistics will appear here");
-        currentMatrix = null;
+        canvas.setOnMouseClicked(event -> {
+            if (matrix == null) return;
 
-        clearMatrixCanvas();
+            double x = event.getX();
+            double y = event.getY();
+
+            List<String> orderedValues = matrix.getOrderedValues();
+            int binCount = orderedValues.size();
+
+            if (binCount > 0 && x >= 0 && y >= 0 && x < MATRIX_SIZE && y < MATRIX_SIZE) {
+                double cellSize = MATRIX_SIZE / binCount;
+                int col = (int) (x / cellSize);
+                int row = (int) (y / cellSize);
+
+                if (row < binCount && col < binCount) {
+                    int[][] matrixData = matrix.getMatrix();
+                    int value = matrixData[row][col];
+                    String fromValue = orderedValues.get(row);
+                    String toValue = orderedValues.get(col);
+
+                    System.out.printf("[%s] Matrix cell clicked: [%d,%d] %s → %s (Count: %d)%n",
+                            matrix.getColumnName(), row, col, fromValue, toValue, value);
+                }
+            }
+        });
     }
 
     private void setupCsvTable() {
@@ -527,8 +445,8 @@ public class HelloController implements Initializable {
                 // 更新表格显示
                 updateCsvTable();
 
-                // 初始化Matrix组件
-                initializeMatrixComponents();
+                // 生成所有列的Matrix
+                generateAllMatrices();
 
                 // 输出处理完成信息到控制台
                 System.out.println(selectedFile.getName() + " 处理完成");
@@ -644,13 +562,9 @@ public class HelloController implements Initializable {
         currentMatrices = null;
 
         // 清理Matrix容器
-        if (matrixContainer != null) {
-            mainContentContainer.getChildren().remove(matrixContainer);
-            matrixContainer = null;
-        }
-
-        // 重置Matrix组件
-        resetMatrixComponents();
+        matrixRowContainer.getChildren().clear();
+        matrixRowContainer.setVisible(false);
+        matrixRowContainer.setManaged(false);
 
         csvTableView.getColumns().clear();
         csvTableView.getItems().clear();
@@ -703,6 +617,4 @@ public class HelloController implements Initializable {
         transition.play();
         leftSidebarExpanded = !leftSidebarExpanded;
     }
-
 }
-

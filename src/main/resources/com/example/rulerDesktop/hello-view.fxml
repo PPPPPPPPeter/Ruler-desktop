@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
-<?import javafx.scene.canvas.Canvas?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
@@ -56,6 +55,15 @@
                             <content>
                                 <VBox fx:id="mainContentContainer" spacing="0.0" style="-fx-background-color: #ecf0f1;">
                                     <children>
+                                        <!-- Matrix容器 - 放置在CSV表格上方 -->
+                                        <HBox fx:id="matrixRowContainer" spacing="0.0" alignment="TOP_LEFT"
+                                              style="-fx-background-color: white; -fx-border-color: #bdc3c7; -fx-border-width: 0 0 1 0;"
+                                              visible="false" managed="false">
+                                            <padding>
+                                                <Insets top="10.0" bottom="10.0" />
+                                            </padding>
+                                        </HBox>
+
                                         <!-- 主要内容区域 -->
                                         <VBox alignment="CENTER" spacing="20.0" style="-fx-background-color: #ecf0f1;" VBox.vgrow="ALWAYS">
                                             <children>
@@ -111,58 +119,10 @@
 
                                 <Separator />
 
-                                <!-- 左侧边栏内容区域 - Matrix组件 -->
-                                <VBox spacing="15.0" VBox.vgrow="ALWAYS">
+                                <!-- 左侧边栏内容区域 -->
+                                <VBox spacing="10.0" VBox.vgrow="ALWAYS">
                                     <children>
-                                        <!-- Matrix标题和控制 -->
-                                        <VBox spacing="10.0">
-                                            <children>
-                                                <Label text="Sequence Matrix" style="-fx-font-size: 16px; -fx-font-weight: bold;" />
-
-                                                <!-- 列选择和分箱控制 -->
-                                                <HBox spacing="10.0" alignment="CENTER_LEFT">
-                                                    <children>
-                                                        <Label text="Column:" />
-                                                        <ComboBox fx:id="matrixColumnComboBox" prefWidth="120.0" onAction="#handleMatrixColumnChange" />
-                                                        <Label text="Bins:" />
-                                                        <Spinner fx:id="matrixBinSpinner" prefWidth="80.0" min="4" max="12" initialValue="6" />
-                                                    </children>
-                                                </HBox>
-
-                                                <!-- Matrix信息显示 -->
-                                                <Label fx:id="matrixInfoLabel" text="No matrix data"
-                                                       style="-fx-font-size: 12px; -fx-text-fill: #666;" />
-                                            </children>
-                                        </VBox>
-
-                                        <!-- Matrix Canvas容器 -->
-                                        <VBox spacing="5.0">
-                                            <children>
-                                                <!-- Matrix Canvas - 固定250x250 -->
-                                                <Canvas fx:id="matrixCanvas" width="250.0" height="250.0"
-                                                        style="-fx-border-color: #bdc3c7; -fx-border-width: 1;" />
-
-                                                <!-- Matrix统计信息 -->
-                                                <VBox spacing="5.0">
-                                                    <children>
-                                                        <Label fx:id="matrixStatsLabel" text="Statistics will appear here"
-                                                               style="-fx-font-size: 11px; -fx-text-fill: #666;" wrapText="true" />
-                                                    </children>
-                                                </VBox>
-                                            </children>
-                                        </VBox>
-
-                                        <!-- Matrix操作按钮 -->
-                                        <HBox spacing="10.0" alignment="CENTER_LEFT">
-                                            <children>
-                                                <Button fx:id="refreshMatrixBtn" text="Refresh" prefWidth="80.0"
-                                                        style="-fx-background-color: #3498db; -fx-text-fill: white;"
-                                                        onAction="#handleRefreshMatrix" />
-                                                <Button fx:id="exportMatrixBtn" text="Export" prefWidth="80.0"
-                                                        style="-fx-background-color: #27ae60; -fx-text-fill: white;"
-                                                        onAction="#handleExportMatrix" />
-                                            </children>
-                                        </HBox>
+                                        <!-- 这里可以添加你的左侧边栏内容 -->
                                     </children>
                                     <VBox.margin>
                                         <Insets left="20.0" right="20.0" top="10.0" />
