@@ -390,6 +390,15 @@ public class HelloController implements Initializable {
         // 设置表格的基本属性
         csvTableView.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         csvTableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+
+        // ===== 新增：监听列顺序变化 =====
+        csvTableView.getColumns().addListener((javafx.beans.InvalidationListener) observable -> {
+            // 延迟执行，确保列顺序已经更新
+            javafx.application.Platform.runLater(() -> {
+                reorderMatrices();
+            });
+        });
+        // ===== 修改结束 =====
     }
 
     private void setupTableResizing() {
@@ -511,6 +520,7 @@ public class HelloController implements Initializable {
             csvTableView.getColumns().add(column);
         }
 
+
         // 设置数据
         ObservableList<Map<String, String>> data = FXCollections.observableArrayList(currentCsvData.getRows());
         csvTableView.setItems(data);
@@ -522,6 +532,45 @@ public class HelloController implements Initializable {
                 currentCsvData.getTotalColumns(),
                 fileName));
     }
+
+
+    // ===== 根据TableView列顺序重新排列Matrix =====
+    private void reorderMatrices() {
+        if (currentMatrices == null || matrixRowContainer.getChildren().isEmpty()) {
+            return;
+        }
+//        System.out.println("Hi");
+        // 获取当前TableView的列顺序
+        ObservableList<TableColumn<Map<String, String>, ?>> columns = csvTableView.getColumns();
+
+        // 创建新的Matrix顺序列表
+        List<javafx.scene.Node> reorderedMatrices = new java.util.ArrayList<>();
+
+        for (TableColumn<Map<String, String>, ?> column : columns) {
+            String columnName = column.getText();
+
+            // 在现有的Matrix容器中找到对应的Matrix
+            for (javafx.scene.Node node : matrixRowContainer.getChildren()) {
+                if (node instanceof VBox) {
+                    VBox matrixCell = (VBox) node;
+                    // 通过标题Label识别对应的Matrix
+                    if (!matrixCell.getChildren().isEmpty() &&
+                            matrixCell.getChildren().get(0) instanceof Label) {
+                        Label label = (Label) matrixCell.getChildren().get(0);
+                        if (label.getText().equals(columnName)) {
+                            reorderedMatrices.add(matrixCell);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 清空并按新顺序添加Matrix
+        matrixRowContainer.getChildren().clear();
+        matrixRowContainer.getChildren().addAll(reorderedMatrices);
+    }
+
 
     private void showAlert(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
