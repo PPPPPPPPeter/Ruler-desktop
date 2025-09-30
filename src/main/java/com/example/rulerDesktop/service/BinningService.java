@@ -95,6 +95,7 @@ public class BinningService {
 
     /**
      * 主分箱方法 - 使用指定策略
+     * 强制分箱模式：完全由用户控制分箱数量
      */
     public BinningResult performBinning(List<String> values, List<DataPoint> dataPoints,
                                         int requestedBinCount, BinningStrategy strategy) {
@@ -209,8 +210,31 @@ public class BinningService {
     }
 
     /**
+     * 不进行分箱，直接使用原值
+     */
+    private BinningResult performNoBinding(List<String> values,
+                                           List<DataPoint> dataPoints,
+                                           BinningResult result) {
+        result.usedStrategy = BinningStrategy.EQUAL_FREQUENCY;
+
+        for (int i = 0; i < values.size(); i++) {
+            String value = values.get(i);
+            result.binnedValues.add(value);
+            result.valueToBinMapping.put(value, value);
+            result.binDetails.computeIfAbsent(value, k -> new ArrayList<>()).add(dataPoints.get(i));
+        }
+
+        result.orderedBinLabels = new ArrayList<>(result.binDetails.keySet());
+        result.actualBinCount = result.orderedBinLabels.size();
+
+        calculateBinStatistics(result, values);
+
+        return result;
+    }
+
+    /**
      * 分类数据分箱（非数值）
-     * 改进版：支持多种分组策略
+     * 强制分箱模式：严格控制分箱数量
      */
     private BinningResult performCategoricalBinning(List<String> values,
                                                     List<DataPoint> dataPoints,
@@ -224,70 +248,58 @@ public class BinningService {
 
         int uniqueValueCount = valueFrequency.size();
 
-        // 情况1：唯一值数量少于或等于请求的bin数量，直接使用原值
-        if (uniqueValueCount <= binCount) {
-            result.usedStrategy = BinningStrategy.EQUAL_FREQUENCY;
+        // 强制分箱：根据用户指定的binCount来分组
+        // 注意：此时已经在主方法中检查过 uniqueValueCount >= binCount
 
-            for (int i = 0; i < values.size(); i++) {
-                String value = values.get(i);
-                result.binnedValues.add(value);
-                result.valueToBinMapping.put(value, value);
-                result.binDetails.computeIfAbsent(value, k -> new ArrayList<>()).add(dataPoints.get(i));
+        // 根据策略选择分组方法
+        BinningStrategy actualStrategy = strategy;
+        if (strategy == BinningStrategy.AUTO) {
+            actualStrategy = BinningStrategy.TOP_K;
+        } else if (strategy == BinningStrategy.EQUAL_FREQUENCY ||
+                strategy == BinningStrategy.EQUAL_WIDTH ||
+                strategy == BinningStrategy.NATURAL_BREAKS ||
+                strategy == BinningStrategy.STURGES) {
+            actualStrategy = BinningStrategy.TOP_K;
+        }
+
+        result.usedStrategy = actualStrategy;
+
+        // 选择要保留的值（前 binCount-1 个，剩余归为 Other）
+        Set<String> keptValues;
+
+        switch (actualStrategy) {
+            case TOP_K:
+                keptValues = getTopKValues(valueFrequency, binCount - 1);
+                break;
+            case FREQUENCY_THRESHOLD:
+                keptValues = getFrequentValues(valueFrequency, values.size(), binCount - 1);
+                break;
+            case ALPHABETICAL:
+                keptValues = getAlphabeticalValues(valueFrequency, binCount - 1);
+                break;
+            default:
+                keptValues = getTopKValues(valueFrequency, binCount - 1);
+        }
+
+        boolean hasOther = keptValues.size() < uniqueValueCount;
+
+        // 映射值到bins
+        for (int i = 0; i < values.size(); i++) {
+            String originalValue = values.get(i);
+            String binLabel;
+
+            if (keptValues.contains(originalValue)) {
+                binLabel = originalValue;
+            } else if (hasOther) {
+                binLabel = "Other";
+            } else {
+                binLabel = originalValue;
             }
-        } else {
-            // 情况2：唯一值数量多于bin数量，需要分组
 
-            // 根据策略选择分组方法
-            BinningStrategy actualStrategy = strategy;
-            if (strategy == BinningStrategy.AUTO) {
-                // 自动选择：默认使用TOP_K
-                actualStrategy = BinningStrategy.TOP_K;
-            } else if (strategy == BinningStrategy.EQUAL_FREQUENCY ||
-                    strategy == BinningStrategy.EQUAL_WIDTH ||
-                    strategy == BinningStrategy.NATURAL_BREAKS ||
-                    strategy == BinningStrategy.STURGES) {
-                // 数值策略，对分类数据使用TOP_K
-                actualStrategy = BinningStrategy.TOP_K;
-            }
-
-            result.usedStrategy = actualStrategy;
-
-            Set<String> keptValues;
-
-            switch (actualStrategy) {
-                case TOP_K:
-                    keptValues = getTopKValues(valueFrequency, binCount - 1);
-                    break;
-                case FREQUENCY_THRESHOLD:
-                    keptValues = getFrequentValues(valueFrequency, values.size(), binCount - 1);
-                    break;
-                case ALPHABETICAL:
-                    keptValues = getAlphabeticalValues(valueFrequency, binCount - 1);
-                    break;
-                default:
-                    keptValues = getTopKValues(valueFrequency, binCount - 1);
-            }
-
-            boolean hasOther = keptValues.size() < uniqueValueCount;
-
-            // 映射值到bins
-            for (int i = 0; i < values.size(); i++) {
-                String originalValue = values.get(i);
-                String binLabel;
-
-                if (keptValues.contains(originalValue)) {
-                    binLabel = originalValue;
-                } else if (hasOther) {
-                    binLabel = "Other";
-                } else {
-                    binLabel = originalValue;
-                }
-
-                result.binnedValues.add(binLabel);
-                result.valueToBinMapping.put(originalValue, binLabel);
-                result.binDetails.computeIfAbsent(binLabel, k -> new ArrayList<>())
-                        .add(dataPoints.get(i));
-            }
+            result.binnedValues.add(binLabel);
+            result.valueToBinMapping.put(originalValue, binLabel);
+            result.binDetails.computeIfAbsent(binLabel, k -> new ArrayList<>())
+                    .add(dataPoints.get(i));
         }
 
         result.orderedBinLabels = new ArrayList<>(result.binDetails.keySet());
@@ -457,7 +469,7 @@ public class BinningService {
     }
 
     /**
-     * 等宽分箱
+     * 等宽分箱（强制分箱模式）
      */
     private BinningResult performEqualWidthBinning(List<String> values,
                                                    List<DataPoint> dataPoints,
@@ -481,6 +493,13 @@ public class BinningService {
 
         double min = numericValues.stream().min(Double::compare).orElse(0.0);
         double max = numericValues.stream().max(Double::compare).orElse(0.0);
+
+        // 如果所有值相同，无法分箱
+        if (min == max) {
+            return performNoBinding(values, dataPoints, result);
+        }
+
+        // 强制分箱：即使数据分布不均，也分成指定数量的bins
         double width = (max - min) / binCount;
 
         // 创建bins
@@ -493,6 +512,8 @@ public class BinningService {
             } else if (dataNormalizationService.isNumericValue(value)) {
                 double numValue = Double.parseDouble(value);
                 int binIndex = (int) ((numValue - min) / width);
+
+                // 处理边界情况：最大值应该在最后一个bin
                 if (binIndex >= binCount) binIndex = binCount - 1;
 
                 double binMin = min + binIndex * width;
@@ -676,79 +697,4 @@ public class BinningService {
         }
     }
 
-    /**
-     * 推荐最佳bin数量
-     */
-    public int recommendBinCount(List<String> values) {
-        if (values == null || values.isEmpty()) {
-            return DEFAULT_BIN_COUNT;
-        }
-
-        // 过滤数值
-        List<Double> numericValues = values.stream()
-                .filter(v -> !v.equals("<NULL>") && !v.equals("<EMPTY>"))
-                .filter(dataNormalizationService::isNumericValue)
-                .map(Double::parseDouble)
-                .collect(Collectors.toList());
-
-        if (numericValues.isEmpty()) {
-            // 分类数据，返回唯一值数量
-            return Math.min(MAX_BIN_COUNT,
-                    (int) values.stream().distinct().count());
-        }
-
-        // 使用多种规则取平均
-        int n = numericValues.size();
-        int sturges = calculateSturgesBins(n);
-        int scott = calculateScottBins(numericValues);
-        int freedmanDiaconis = calculateFreedmanDiaconisBins(numericValues);
-
-        int recommended = (sturges + scott + freedmanDiaconis) / 3;
-        return Math.max(MIN_BIN_COUNT, Math.min(MAX_BIN_COUNT, recommended));
-    }
-
-    /**
-     * Scott规则计算bin数量
-     */
-    private int calculateScottBins(List<Double> values) {
-        double mean = values.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
-        double variance = values.stream()
-                .mapToDouble(v -> Math.pow(v - mean, 2))
-                .average().orElse(0.0);
-        double stdDev = Math.sqrt(variance);
-
-        double min = values.stream().min(Double::compare).orElse(0.0);
-        double max = values.stream().max(Double::compare).orElse(0.0);
-        double range = max - min;
-
-        if (stdDev == 0 || range == 0) return DEFAULT_BIN_COUNT;
-
-        double binWidth = 3.5 * stdDev / Math.cbrt(values.size());
-        int bins = (int) Math.ceil(range / binWidth);
-
-        return Math.max(MIN_BIN_COUNT, Math.min(MAX_BIN_COUNT, bins));
-    }
-
-    /**
-     * Freedman-Diaconis规则计算bin数量
-     */
-    private int calculateFreedmanDiaconisBins(List<Double> values) {
-        List<Double> sorted = values.stream().sorted().collect(Collectors.toList());
-        int n = sorted.size();
-
-        double q1 = sorted.get(n / 4);
-        double q3 = sorted.get(3 * n / 4);
-        double iqr = q3 - q1;
-
-        double min = sorted.get(0);
-        double max = sorted.get(n - 1);
-        double range = max - min;
-
-        if (iqr == 0 || range == 0) return DEFAULT_BIN_COUNT;
-
-        double binWidth = 2.0 * iqr / Math.cbrt(n);
-        int bins = (int) Math.ceil(range / binWidth);
-
-        return Math.max(MIN_BIN_COUNT, Math.min(MAX_BIN_COUNT, bins));
-    }
 }
