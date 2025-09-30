@@ -182,13 +182,24 @@ public class CsvParsingService {
         // 第一行作为标题
         List<String> headers = new ArrayList<>(allRows.get(0));
 
-        // 清理标题（移除引号，处理空标题）
+        // 清理标题（移除引号，处理空标题和同名列）
+        Map<String, Integer> headerCount = new HashMap<>();
         for (int i = 0; i < headers.size(); i++) {
             String header = headers.get(i);
             if (header.isEmpty()) {
                 header = "Column_" + (i + 1);
             }
-            headers.set(i, cleanField(header));
+            header = cleanField(header);
+
+            // 处理同名列：如果列名已存在，添加后缀
+            String originalHeader = header;
+            int count = headerCount.getOrDefault(originalHeader, 0);
+            if (count > 0) {
+                header = originalHeader + "_" + count;
+            }
+            headerCount.put(originalHeader, count + 1);
+
+            headers.set(i, header);
         }
 
         // 处理数据行

@@ -49,7 +49,8 @@ public class HistogramService {
 
         Histogram histogram = new Histogram();
         histogram.setColumnName(columnName);
-        histogram.setBinCount(binCount);
+//        histogram.setBinCount(binCount);
+        histogram.setActualBinCount(binCount);
 
         int columnIndex = csvData.getHeaders().indexOf(columnName);
 
@@ -128,7 +129,8 @@ public class HistogramService {
         }
 
         // 重新分箱
-        histogram.setBinCount(newBinCount);
+//        histogram.setBinCount(newBinCount);
+        histogram.setActualBinCount(newBinCount);
         histogram.getBinDetails().clear();
         histogram.getValueToBinMapping().clear();
 
@@ -232,7 +234,7 @@ public class HistogramService {
 
         // 基本信息
         stats.put("columnName", histogram.getColumnName());
-        stats.put("binCount", histogram.getBinCount());
+//        stats.put("binCount", histogram.getBinCount());
         stats.put("actualBinCount", histogram.getActualBinCount());
         stats.put("totalRecords", histogram.getTotalRecords());
 
@@ -363,7 +365,7 @@ public class HistogramService {
         }
 
         System.out.println("Histogram for column: " + histogram.getColumnName());
-        System.out.println("Bin count: " + histogram.getBinCount());
+//        System.out.println("Bin count: " + histogram.getBinCount());
         System.out.println("Actual bin count: " + histogram.getActualBinCount());
         System.out.println("Total records: " + histogram.getTotalRecords());
         System.out.println();

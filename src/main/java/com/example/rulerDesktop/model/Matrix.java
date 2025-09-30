@@ -7,7 +7,7 @@ import java.util.Map;
 
 public class Matrix {
     private String columnName;
-    private int binCount;
+//    private int binCount;
     private int actualBinCount;
     private List<String> orderedValues;
     private int[][] matrix;
@@ -26,8 +26,8 @@ public class Matrix {
     // Getters and Setters
     public String getColumnName() { return columnName; }
     public void setColumnName(String columnName) { this.columnName = columnName; }
-    public int getBinCount() { return binCount; }
-    public void setBinCount(int binCount) { this.binCount = binCount; }
+//    public int getBinCount() { return binCount; }
+//    public void setBinCount(int binCount) { this.binCount = binCount; }
     public int getActualBinCount() { return actualBinCount; }
     public void setActualBinCount(int actualBinCount) { this.actualBinCount = actualBinCount; }
     public List<String> getOrderedValues() { return orderedValues; }

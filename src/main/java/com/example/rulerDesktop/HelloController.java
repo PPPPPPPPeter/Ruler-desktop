@@ -22,6 +22,7 @@ import javafx.util.Duration;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -183,9 +184,10 @@ public class HelloController implements Initializable {
         controls.setAlignment(Pos.CENTER);
 
         Label binLabel = new Label("Bins:");
-        Spinner<Integer> binSpinner = new Spinner<>(1, 50, matrix.getBinCount());
+
+        Spinner<Integer> binSpinner = new Spinner<>(2, 50, matrix.getActualBinCount());
         binSpinner.setPrefWidth(57);
-        binSpinner.setEditable(false);
+//        binSpinner.setEditable(false);
 
 //        // 检查是否为非数字类型，禁用Spinner
 //        List<String> originalValues = matrix.getOriginalValues();
@@ -205,6 +207,7 @@ public class HelloController implements Initializable {
         // 分箱数量变化监听（现在canvas已经声明了）
         binSpinner.valueProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null && !newVal.equals(oldVal)) {
+//                System.out.println( " ========================================================= CC");
                 updateMatrixBinCount(columnName, newVal, canvas);
             }
         });
@@ -222,6 +225,7 @@ public class HelloController implements Initializable {
 
         return cell;
     }
+
 
     // 渲染Matrix到指定Canvas
     private void renderMatrixToCanvas(Canvas canvas, Matrix matrix) {
@@ -322,7 +326,8 @@ public class HelloController implements Initializable {
                 currentMatrices.put(columnName, matrix);
                 renderMatrixToCanvas(canvas, matrix);
                 setupCanvasInteraction(canvas, matrix);
-                System.out.println("列 '" + columnName + "' 的Matrix bins更新为: " + newBinCount);
+                System.out.println("列 '" + columnName + "' 的Matrix bins更新为: " + newBinCount + "ABin"+ matrix.getActualBinCount());
+
             }
         } catch (Exception e) {
             System.err.println("更新Matrix分箱时出错: " + e.getMessage());
@@ -570,6 +575,7 @@ public class HelloController implements Initializable {
         matrixRowContainer.getChildren().clear();
         matrixRowContainer.getChildren().addAll(reorderedMatrices);
     }
+
 
 
     private void showAlert(String title, String message) {

@@ -45,7 +45,8 @@ public class MatrixService {
 
         Matrix matrix = new Matrix();
         matrix.setColumnName(columnName);
-        matrix.setBinCount(binCount);
+//        matrix.setBinCount(binCount);
+        matrix.setActualBinCount(binCount);
 
         int columnIndex = csvData.getHeaders().indexOf(columnName);
 
@@ -114,8 +115,7 @@ public class MatrixService {
             }
         }
 
-        // 清空并重新分箱
-        matrix.setBinCount(newBinCount);
+        matrix.setActualBinCount(newBinCount);
         matrix.getBinDetails().clear();
 
         // 使用BinningService进行分箱
@@ -132,6 +132,9 @@ public class MatrixService {
         matrix.setActualBinCount(binningResult.getActualBinCount());
 
         generateSequenceMatrix(matrix, binningResult.getBinnedValues());
+
+//        this.printMatrix(matrix);
+
         return matrix;
     }
 
@@ -280,7 +283,7 @@ public class MatrixService {
         }
 
         System.out.println("Matrix for column: " + matrix.getColumnName());
-        System.out.println("Bin count: " + matrix.getBinCount());
+//        System.out.println("Bin count: " + matrix.getBinCount());
         System.out.println("Actual bin count: " + matrix.getActualBinCount());
         System.out.println("Total sequences: " + matrix.getTotalSequences());
 
