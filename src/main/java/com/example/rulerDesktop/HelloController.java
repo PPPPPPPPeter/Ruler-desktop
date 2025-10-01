@@ -22,7 +22,6 @@ import javafx.util.Duration;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -109,7 +108,7 @@ public class HelloController implements Initializable {
     private Map<String, Matrix> currentMatrices; // 存储所有列的Matrix数据
 
     // Matrix渲染常量
-    private static final double MATRIX_SIZE = 180.0;
+    private static final double MATRIX_SIZE = 160.0;
     private static final Color MATRIX_GRID_COLOR = Color.LIGHTGRAY;
     private static final Color MATRIX_BACKGROUND_COLOR = Color.WHITE;
 
