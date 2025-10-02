@@ -1,15 +1,18 @@
 package com.example.rulerDesktop;
 
 import com.example.rulerDesktop.model.CsvData;
+import com.example.rulerDesktop.model.Histogram;
 import com.example.rulerDesktop.model.Matrix;
 import com.example.rulerDesktop.service.CsvParsingService;
 import com.example.rulerDesktop.service.MatrixService;
+import com.example.rulerDesktop.service.HistogramService;
 import javafx.animation.TranslateTransition;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
@@ -87,6 +90,10 @@ public class HelloController implements Initializable {
     @FXML
     private HBox matrixRowContainer;
 
+    // 2. 添加Histogram容器到FXML声明区域（在matrixRowContainer下方）
+    @FXML
+    private HBox histogramRowContainer;
+
     private boolean leftSidebarExpanded = false;
     private boolean rightSidebarExpanded = false;
 
@@ -111,6 +118,10 @@ public class HelloController implements Initializable {
     private static final double MATRIX_SIZE = 160.0;
     private static final Color MATRIX_GRID_COLOR = Color.LIGHTGRAY;
     private static final Color MATRIX_BACKGROUND_COLOR = Color.WHITE;
+
+    // 1. 添加成员变量
+    private final HistogramService histogramService = new HistogramService();
+    private Map<String, Histogram> currentHistograms; // 存储所有列的Histogram数据
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
@@ -157,15 +168,15 @@ public class HelloController implements Initializable {
     // 创建单个Matrix单元格组件
     private VBox createMatrixCell(Matrix matrix, String columnName) {
         VBox cell = new VBox(5);
-        cell.setPrefWidth(480.0);
-        cell.setMinWidth(480.0);
-        cell.setMaxWidth(480.0);
+        cell.setPrefWidth(400.0);
+        cell.setMinWidth(400.0);
+        cell.setMaxWidth(400.0);
         cell.setAlignment(Pos.TOP_CENTER);
         cell.setStyle("-fx-padding: 5;");
 
         // ===== 新增：添加列标题 =====
         Label columnLabel = new Label(columnName);
-        columnLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        columnLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
         columnLabel.setAlignment(Pos.CENTER);
         cell.getChildren().add(columnLabel);
         // ===== 修改结束 =====
@@ -186,22 +197,6 @@ public class HelloController implements Initializable {
 
         Spinner<Integer> binSpinner = new Spinner<>(2, 50, matrix.getActualBinCount());
         binSpinner.setPrefWidth(57);
-//        binSpinner.setEditable(false);
-
-//        // 检查是否为非数字类型，禁用Spinner
-//        List<String> originalValues = matrix.getOriginalValues();
-//        boolean isNonNumeric = false;
-//        if (originalValues != null && !originalValues.isEmpty()) {
-//            isNonNumeric = !new com.example.rulerDesktop.service.DataNormalizationService()
-//                    .isNumericColumn(originalValues);
-//        }
-//
-//        if (isNonNumeric) {
-//            binSpinner.setDisable(true);
-//            binLabel.setStyle("-fx-text-fill: #999;");
-//            // 将Spinner的值设置为实际分箱数
-//            binSpinner.getValueFactory().setValue(matrix.getActualBinCount());
-//        }
 
         // 分箱数量变化监听（现在canvas已经声明了）
         binSpinner.valueProperty().addListener((obs, oldVal, newVal) -> {
@@ -390,19 +385,174 @@ public class HelloController implements Initializable {
         });
     }
 
+    // 3. 在generateAllMatrices()方法之后添加生成所有Histogram的方法
+    private void generateAllHistograms() {
+        if (currentCsvData == null || currentCsvData.getHeaders().isEmpty()) {
+            return;
+        }
+
+        try {
+            // 使用HistogramService批量生成所有列的Histogram
+            currentHistograms = histogramService.generateAllHistograms(currentCsvData, 6); // 默认6个bins
+
+            // 清空并重新构建Histogram容器
+            histogramRowContainer.getChildren().clear();
+
+            // 为每一列创建Histogram组件
+            List<String> headers = currentCsvData.getHeaders();
+            for (String columnName : headers) {
+                Histogram histogram = currentHistograms.get(columnName);
+                if (histogram != null) {
+                    VBox histogramCell = createHistogramCell(histogram, columnName);
+//                    HBox.setMargin(histogramCell, new Insets(0, 40, 0, 0)); // 左右各40px间隙，可调整
+                    histogramRowContainer.getChildren().add(histogramCell);
+                }
+            }
+
+            // 显示Histogram容器
+            histogramRowContainer.setVisible(true);
+            histogramRowContainer.setManaged(true);
+
+            System.out.println("成功为所有 " + headers.size() + " 列生成Histogram");
+
+        } catch (Exception e) {
+            System.err.println("生成所有Histogram时出错: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    // 4. 创建单个Histogram单元格组件
+    private VBox createHistogramCell(Histogram histogram, String columnName) {
+        VBox cell = new VBox(5);
+        cell.setPrefWidth(400.0);
+        cell.setMinWidth(400.0);
+        cell.setMaxWidth(400.0);
+        cell.setAlignment(Pos.TOP_CENTER);
+        cell.setStyle("-fx-padding: 5; -fx-background-color: #f8f9fa;");
+
+        // 添加列标题
+        Label columnLabel = new Label(columnName);
+        columnLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        columnLabel.setAlignment(Pos.CENTER);
+        cell.getChildren().add(columnLabel);
+
+        // 创建Histogram的Canvas - 调整为横向布局
+        // 高度根据bin数量动态调整，每个bar高度约15px
+        int binCount = histogram.getOrderedValues().size();
+        double canvasHeight = Math.max(200, binCount * 15 + 10); // 至少100px，每个bin 15px + 留10px边距
+        Canvas canvas = new Canvas(400, canvasHeight);
+        renderHistogramToCanvas(canvas, histogram);
+
+        // 将Canvas添加到单元格
+        cell.getChildren().add(canvas);
+
+        return cell;
+    }
+
+    // 5. 渲染Histogram到Canvas（横向布局，纯白到纯黑）
+    private void renderHistogramToCanvas(Canvas canvas, Histogram histogram) {
+        if (histogram == null) {
+            return;
+        }
+
+        GraphicsContext gc = canvas.getGraphicsContext2D();
+        gc.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
+
+        List<String> orderedValues = histogram.getOrderedValues();
+        Map<String, Integer> valueFrequency = histogram.getValueFrequency();
+
+        if (orderedValues.isEmpty()) {
+            return;
+        }
+
+        int binCount = orderedValues.size();
+        double canvasWidth = canvas.getWidth();
+        double canvasHeight = canvas.getHeight();
+
+        // 计算每个bar的高度（留出间隙）
+        double barSpacing = 1.0;
+        double barHeight = (canvasHeight - (binCount - 1) * barSpacing) / binCount;
+
+        // 找到最大频率用于缩放
+        int maxFrequency = valueFrequency.values().stream()
+                .mapToInt(Integer::intValue)
+                .max()
+                .orElse(1);
+
+        // 留出左侧空间用于显示bin标签（如果需要）
+        double leftMargin = 5;
+        double maxBarWidth = canvasWidth - leftMargin - 5; // 右侧留5px边距
+
+        // 绘制每个bar（从上到下，横向延伸）
+        double yPosition = 0;
+        for (String binLabel : orderedValues) {
+            Integer frequency = valueFrequency.get(binLabel);
+            if (frequency == null) frequency = 0;
+
+            // 计算bar的宽度（从左往右画）
+            double barWidth = (frequency / (double) maxFrequency) * maxBarWidth;
+
+            // 设置颜色 - 使用纯白到纯黑的灰度
+            // 频率越高，颜色越黑（grayLevel越小）
+            double intensity = frequency / (double) maxFrequency;
+            double grayLevel = 1.0 - intensity; // 1.0=白色，0.0=黑色
+            Color barColor = Color.gray(grayLevel);
+            gc.setFill(barColor);
+
+            // 绘制bar（从左边向右延伸）
+            double barX = leftMargin;
+            gc.fillRect(barX, yPosition, barWidth, barHeight);
+
+            // 绘制边框
+            gc.setStroke(Color.LIGHTGRAY);
+            gc.setLineWidth(0.5);
+            gc.strokeRect(barX, yPosition, barWidth, barHeight);
+
+            // 在bar内部显示频率（如果空间足够）
+            if (barWidth > 30 && barHeight > 10) {
+                // 根据背景颜色选择文字颜色
+                if (intensity > 0.5) {
+                    gc.setFill(Color.WHITE); // 深色背景用白字
+                } else {
+                    gc.setFill(Color.BLACK); // 浅色背景用黑字
+                }
+
+                gc.setFont(javafx.scene.text.Font.font(Math.min(barHeight * 0.6, 10)));
+                String freqText = String.valueOf(frequency);
+                double textWidth = freqText.length() * 6;
+                double textX = barX + 5; // 左对齐，留5px边距
+                double textY = yPosition + barHeight / 2 + 3; // 垂直居中
+                gc.fillText(freqText, textX, textY);
+            }
+
+            // 为空值的bar添加斜线标记
+            if (frequency == 0 && barHeight > 8) {
+                gc.setStroke(Color.LIGHTGRAY);
+                gc.setLineWidth(1);
+                gc.strokeLine(barX, yPosition, barX + 20, yPosition + barHeight);
+            }
+
+            yPosition += barHeight + barSpacing;
+        }
+
+        // 绘制左侧基线
+        gc.setStroke(Color.BLACK);
+        gc.setLineWidth(2);
+        gc.strokeLine(leftMargin, 0, leftMargin, canvasHeight);
+    }
+
     private void setupCsvTable() {
         // 设置表格的基本属性
         csvTableView.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         csvTableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
 
-        // ===== 新增：监听列顺序变化 =====
         csvTableView.getColumns().addListener((javafx.beans.InvalidationListener) observable -> {
-            // 延迟执行，确保列顺序已经更新
+
             javafx.application.Platform.runLater(() -> {
                 reorderMatrices();
             });
         });
-        // ===== 修改结束 =====
+
     }
 
     private void setupTableResizing() {
@@ -461,6 +611,10 @@ public class HelloController implements Initializable {
                 // 生成所有列的Matrix
                 generateAllMatrices();
 
+
+                generateAllHistograms();
+
+
                 // 输出处理完成信息到控制台
                 System.out.println(selectedFile.getName() + " 处理完成");
 
@@ -497,8 +651,8 @@ public class HelloController implements Initializable {
             String header = headers.get(colIndex);
 
             TableColumn<Map<String, String>, String> column = new TableColumn<>(header);
-            column.setPrefWidth(480.0);
-            column.setMinWidth(480.0);
+            column.setPrefWidth(400.0);
+            column.setMinWidth(400.0);
 
             // 禁用排序功能
             column.setSortable(false);
@@ -614,11 +768,17 @@ public class HelloController implements Initializable {
     private void handleResetAll() {
         currentCsvData = null;
         currentMatrices = null;
+        currentHistograms = null; // 新增
 
         // 清理Matrix容器
         matrixRowContainer.getChildren().clear();
         matrixRowContainer.setVisible(false);
         matrixRowContainer.setManaged(false);
+
+        // ===== 新增：清理Histogram容器 =====
+        histogramRowContainer.getChildren().clear();
+        histogramRowContainer.setVisible(false);
+        histogramRowContainer.setManaged(false);
 
         csvTableView.getColumns().clear();
         csvTableView.getItems().clear();
