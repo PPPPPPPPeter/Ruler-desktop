@@ -211,6 +211,7 @@ public class HelloController implements Initializable {
         binSpinner.valueProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null && !newVal.equals(oldVal)) {
                 updateMatrixBinCount(columnName, newVal, canvas);
+                updateHistogramBinCount(columnName, newVal); // 同时更新Histogram
             }
         });
 
@@ -336,8 +337,104 @@ public class HelloController implements Initializable {
         }
     }
 
+    private void updateHistogramBinCount(String columnName, int newBinCount) {
+        try {
+            Histogram histogram = currentHistograms.get(columnName);
+            if (histogram != null) {
+                // 使用HistogramService更新分箱
+                histogram = histogramService.updateSingleHistogramBinCount(histogram, newBinCount);
+                currentHistograms.put(columnName, histogram);
+
+                // 找到对应的Histogram Canvas并重新渲染
+                Canvas histogramCanvas = findHistogramCanvas(columnName);
+                if (histogramCanvas != null) {
+                    renderHistogramToCanvas(histogramCanvas, histogram);
+                    setupHistogramCanvasInteraction(histogramCanvas, histogram);
+                }
+
+                System.out.println("列 '" + columnName + "' 的Histogram bins更新为: " + newBinCount +
+                        " (实际: " + histogram.getActualBinCount() + ")");
+            }
+        } catch (Exception e) {
+            System.err.println("更新Histogram分箱时出错: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private Canvas findHistogramCanvas(String columnName) {
+        for (javafx.scene.Node node : histogramRowContainer.getChildren()) {
+            if (node instanceof VBox) {
+                VBox histogramCell = (VBox) node;
+                // 通过标题Label识别对应的Histogram
+                if (!histogramCell.getChildren().isEmpty() &&
+                        histogramCell.getChildren().get(0) instanceof Label) {
+                    Label label = (Label) histogramCell.getChildren().get(0);
+                    if (label.getText().equals(columnName)) {
+                        // 找到Canvas（第二个子元素）
+                        if (histogramCell.getChildren().size() > 1 &&
+                                histogramCell.getChildren().get(1) instanceof Canvas) {
+                            return (Canvas) histogramCell.getChildren().get(1);
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+
+    private void reorderHistograms() {
+        if (currentHistograms == null || histogramRowContainer.getChildren().isEmpty()) {
+            return;
+        }
+
+        // 获取当前TableView的列顺序
+        ObservableList<TableColumn<Map<String, String>, ?>> columns = csvTableView.getColumns();
+
+        // 创建新的Histogram顺序列表
+        List<javafx.scene.Node> reorderedHistograms = new java.util.ArrayList<>();
+
+        for (TableColumn<Map<String, String>, ?> column : columns) {
+            String columnName = column.getText();
+
+            // 在现有的Histogram容器中找到对应的Histogram
+            for (javafx.scene.Node node : histogramRowContainer.getChildren()) {
+                if (node instanceof VBox) {
+                    VBox histogramCell = (VBox) node;
+                    // 通过标题Label识别对应的Histogram
+                    if (!histogramCell.getChildren().isEmpty() &&
+                            histogramCell.getChildren().get(0) instanceof Label) {
+                        Label label = (Label) histogramCell.getChildren().get(0);
+                        if (label.getText().equals(columnName)) {
+                            reorderedHistograms.add(histogramCell);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 清空并按新顺序添加Histogram
+        histogramRowContainer.getChildren().clear();
+        histogramRowContainer.getChildren().addAll(reorderedHistograms);
+    }
+
+
     // 设置Canvas交互
+    // 优化setupCanvasInteraction方法
     private void setupCanvasInteraction(Canvas canvas, Matrix matrix) {
+        // 创建一个共享的Tooltip，避免重复创建
+        final Tooltip tooltip = new Tooltip();
+        tooltip.setShowDelay(javafx.util.Duration.millis(50)); // 设置极短的延迟
+        tooltip.setHideDelay(javafx.util.Duration.millis(100)); // 快速隐藏
+        tooltip.setShowDuration(javafx.util.Duration.INDEFINITE); // 保持显示直到鼠标移开
+
+        // 安装tooltip到canvas
+        Tooltip.install(canvas, tooltip);
+
+        // 用于缓存当前单元格位置，避免重复更新
+        final int[] lastCell = {-1, -1};
+
         canvas.setOnMouseMoved(event -> {
             if (matrix == null) return;
 
@@ -352,44 +449,32 @@ public class HelloController implements Initializable {
                 int col = (int) (x / cellSize);
                 int row = (int) (y / cellSize);
 
-                if (row < binCount && col < binCount) {
+                // 检查是否移动到新的单元格
+                if (row < binCount && col < binCount && (row != lastCell[0] || col != lastCell[1])) {
+                    lastCell[0] = row;
+                    lastCell[1] = col;
+
                     int[][] matrixData = matrix.getMatrix();
                     int value = matrixData[row][col];
                     String fromValue = orderedValues.get(row);
                     String toValue = orderedValues.get(col);
 
+                    // 直接更新tooltip文本，而不是重新创建
                     String tooltipText = String.format("%s: %s → %s | Count: %d",
                             matrix.getColumnName(), fromValue, toValue, value);
-                    Tooltip tooltip = new Tooltip(tooltipText);
-                    Tooltip.install(canvas, tooltip);
+                    tooltip.setText(tooltipText);
                 }
             }
         });
 
+        // 鼠标离开时重置缓存
+        canvas.setOnMouseExited(event -> {
+            lastCell[0] = -1;
+            lastCell[1] = -1;
+        });
+
         canvas.setOnMouseClicked(event -> {
-            if (matrix == null) return;
-
-            double x = event.getX();
-            double y = event.getY();
-
-            List<String> orderedValues = matrix.getOrderedValues();
-            int binCount = orderedValues.size();
-
-            if (binCount > 0 && x >= 0 && y >= 0 && x < MATRIX_SIZE && y < MATRIX_SIZE) {
-                double cellSize = MATRIX_SIZE / binCount;
-                int col = (int) (x / cellSize);
-                int row = (int) (y / cellSize);
-
-                if (row < binCount && col < binCount) {
-                    int[][] matrixData = matrix.getMatrix();
-                    int value = matrixData[row][col];
-                    String fromValue = orderedValues.get(row);
-                    String toValue = orderedValues.get(col);
-
-                    System.out.printf("[%s] Matrix cell clicked: [%d,%d] %s → %s (Count: %d)%n",
-                            matrix.getColumnName(), row, col, fromValue, toValue, value);
-                }
-            }
+            //TODO - Peter
         });
     }
 
@@ -447,10 +532,117 @@ public class HelloController implements Initializable {
         Canvas canvas = new Canvas(HISTOGRAM_CELL_WIDTH, HISTOGRAM_FIXED_HEIGHT);
         renderHistogramToCanvas(canvas, histogram);
 
+        // 添加鼠标交互
+        setupHistogramCanvasInteraction(canvas, histogram);
+
         // 将Canvas添加到单元格
         cell.getChildren().add(canvas);
 
         return cell;
+    }
+
+
+    // 添加新方法：设置Histogram Canvas的交互功能
+    private void setupHistogramCanvasInteraction(Canvas canvas, Histogram histogram) {
+        // 创建一个共享的Tooltip，避免重复创建
+        final Tooltip tooltip = new Tooltip();
+        tooltip.setShowDelay(javafx.util.Duration.millis(50)); // 设置极短的延迟
+        tooltip.setHideDelay(javafx.util.Duration.millis(100)); // 快速隐藏
+        tooltip.setShowDuration(javafx.util.Duration.INDEFINITE); // 保持显示直到鼠标移开
+
+        // 安装tooltip到canvas
+        Tooltip.install(canvas, tooltip);
+
+        // 用于缓存当前bar的索引，避免重复更新
+        final int[] lastBarIndex = {-1};
+
+        canvas.setOnMouseMoved(event -> {
+            if (histogram == null) return;
+
+            double mouseX = event.getX();
+            double mouseY = event.getY();
+
+            List<String> orderedValues = histogram.getOrderedValues();
+            Map<String, Integer> valueFrequency = histogram.getValueFrequency();
+
+            if (orderedValues.isEmpty()) return;
+
+            int binCount = orderedValues.size();
+
+            // 计算布局参数（与renderHistogramToCanvas保持一致）
+            double topMargin = 5.0;
+            double bottomMargin = 5.0;
+            double availableHeight = canvas.getHeight() - topMargin - bottomMargin;
+
+            // 间隙大小根据bin数量调整
+            double barSpacing;
+            if (binCount <= 5) {
+                barSpacing = 3.0;
+            } else if (binCount <= 10) {
+                barSpacing = 2.0;
+            } else if (binCount <= 20) {
+                barSpacing = 1.5;
+            } else {
+                barSpacing = 1.0;
+            }
+
+            // 计算bar高度
+            double totalSpacing = (binCount - 1) * barSpacing;
+            double barHeight = (availableHeight - totalSpacing) / binCount;
+            barHeight = Math.max(1.0, barHeight);
+
+            // 判断是否显示标注
+            boolean showLabels = binCount < HISTOGRAM_LABEL_THRESHOLD;
+            double leftMargin = showLabels ? 60 : 10;
+
+            // 计算鼠标悬浮在哪个bar上
+            double yPosition = topMargin;
+            int hoveredBarIndex = -1;
+
+            for (int i = 0; i < binCount; i++) {
+                if (mouseY >= yPosition && mouseY < yPosition + barHeight) {
+                    hoveredBarIndex = i;
+                    break;
+                }
+                yPosition += barHeight + barSpacing;
+            }
+
+            // 检查鼠标是否在有效的bar区域内
+            if (hoveredBarIndex >= 0 && hoveredBarIndex < binCount && mouseX >= leftMargin) {
+                // 只有当悬浮在新的bar上时才更新tooltip
+                if (hoveredBarIndex != lastBarIndex[0]) {
+                    lastBarIndex[0] = hoveredBarIndex;
+
+                    String binLabel = orderedValues.get(hoveredBarIndex);
+                    Integer frequency = valueFrequency.get(binLabel);
+                    if (frequency == null) frequency = 0;
+
+                    // 计算百分比
+                    int totalRecords = histogram.getTotalRecords();
+                    double percentage = totalRecords > 0 ? (double) frequency / totalRecords * 100 : 0.0;
+
+                    // 格式化tooltip文本
+                    String tooltipText = String.format("%s: %s | Count: %d (%.1f%%)",
+                            histogram.getColumnName(), binLabel, frequency, percentage);
+                    tooltip.setText(tooltipText);
+                }
+            } else {
+                // 鼠标不在任何bar上，重置索引
+                if (lastBarIndex[0] != -1) {
+                    lastBarIndex[0] = -1;
+                }
+            }
+        });
+
+        // 鼠标离开时重置缓存
+        canvas.setOnMouseExited(event -> {
+            lastBarIndex[0] = -1;
+        });
+
+        // 鼠标点击事件（可选，用于调试或其他交互）
+        canvas.setOnMouseClicked(event -> {
+            // TODO - Peter
+        });
     }
 
     // 5. 渲染Histogram到Canvas（横向布局，纯白到纯黑）
@@ -630,13 +822,13 @@ public class HelloController implements Initializable {
         csvTableView.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         csvTableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
 
+        // 监听列顺序变化，同步reorder Matrix和Histogram
         csvTableView.getColumns().addListener((javafx.beans.InvalidationListener) observable -> {
-
             javafx.application.Platform.runLater(() -> {
                 reorderMatrices();
+                reorderHistograms();
             });
         });
-
     }
 
     private void setupTableResizing() {
