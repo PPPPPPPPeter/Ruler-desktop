@@ -168,9 +168,9 @@ public class HelloController implements Initializable {
     // 创建单个Matrix单元格组件
     private VBox createMatrixCell(Matrix matrix, String columnName) {
         VBox cell = new VBox(5);
-        cell.setPrefWidth(400.0);
-        cell.setMinWidth(400.0);
-        cell.setMaxWidth(400.0);
+        cell.setPrefWidth(450.0);
+        cell.setMinWidth(450.0);
+        cell.setMaxWidth(450.0);
         cell.setAlignment(Pos.TOP_CENTER);
         cell.setStyle("-fx-padding: 5;");
 
@@ -179,7 +179,6 @@ public class HelloController implements Initializable {
         columnLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
         columnLabel.setAlignment(Pos.CENTER);
         cell.getChildren().add(columnLabel);
-        // ===== 修改结束 =====
 
         // 创建水平布局，将控制器放在Canvas左侧
         HBox mainLayout = new HBox(10);
@@ -424,9 +423,9 @@ public class HelloController implements Initializable {
     // 4. 创建单个Histogram单元格组件
     private VBox createHistogramCell(Histogram histogram, String columnName) {
         VBox cell = new VBox(5);
-        cell.setPrefWidth(400.0);
-        cell.setMinWidth(400.0);
-        cell.setMaxWidth(400.0);
+        cell.setPrefWidth(450.0);
+        cell.setMinWidth(450.0);
+        cell.setMaxWidth(450.0);
         cell.setAlignment(Pos.TOP_CENTER);
         cell.setStyle("-fx-padding: 5; -fx-background-color: #f8f9fa;");
 
@@ -440,7 +439,7 @@ public class HelloController implements Initializable {
         // 高度根据bin数量动态调整，每个bar高度约15px
         int binCount = histogram.getOrderedValues().size();
         double canvasHeight = Math.max(200, binCount * 15 + 10); // 至少100px，每个bin 15px + 留10px边距
-        Canvas canvas = new Canvas(400, canvasHeight);
+        Canvas canvas = new Canvas(450, canvasHeight);
         renderHistogramToCanvas(canvas, histogram);
 
         // 将Canvas添加到单元格
@@ -651,8 +650,8 @@ public class HelloController implements Initializable {
             String header = headers.get(colIndex);
 
             TableColumn<Map<String, String>, String> column = new TableColumn<>(header);
-            column.setPrefWidth(400.0);
-            column.setMinWidth(400.0);
+            column.setPrefWidth(450.0);
+            column.setMinWidth(450.0);
 
             // 禁用排序功能
             column.setSortable(false);
@@ -692,7 +691,7 @@ public class HelloController implements Initializable {
     }
 
 
-    // ===== 根据TableView列顺序重新排列Matrix =====
+    // 根据TableView列顺序重新排列Matrix
     private void reorderMatrices() {
         if (currentMatrices == null || matrixRowContainer.getChildren().isEmpty()) {
             return;
@@ -775,7 +774,7 @@ public class HelloController implements Initializable {
         matrixRowContainer.setVisible(false);
         matrixRowContainer.setManaged(false);
 
-        // ===== 新增：清理Histogram容器 =====
+        // 清理Histogram容器
         histogramRowContainer.getChildren().clear();
         histogramRowContainer.setVisible(false);
         histogramRowContainer.setManaged(false);
