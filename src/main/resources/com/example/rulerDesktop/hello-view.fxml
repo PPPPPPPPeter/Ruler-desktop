@@ -67,14 +67,15 @@
 
 
 
+                                        <!-- Histogram容器 - 设置maxHeight限制 -->
                                         <HBox fx:id="histogramRowContainer" spacing="0.0" alignment="TOP_LEFT"
                                               style="-fx-background-color: #f8f9fa; -fx-border-color: #bdc3c7; -fx-border-width: 0 0 1 0;"
+                                              maxHeight="230.0"
                                               visible="false" managed="false">
                                             <padding>
-                                                <Insets top="10.0" bottom="5" />
+                                                <Insets top="10.0" bottom="5.0" />
                                             </padding>
                                         </HBox>
-
 
 
 
@@ -94,6 +95,7 @@
 
 
                                         <!-- CSV表格区域 -->
+                                        <!-- CSV表格区域 - 保持原有设置 -->
                                         <VBox fx:id="csvTableContainer" prefHeight="190.0" style="-fx-background-color: white; -fx-border-color: #bdc3c7; -fx-border-width: 1 0 0 0;" visible="false" managed="false">
                                             <children>
                                                 <!-- 可拖拽的标题栏 -->

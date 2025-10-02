@@ -109,7 +109,7 @@ public class HelloController implements Initializable {
     // 用于记录拖拽状态
     private boolean isDragging = false;
     private double dragStartY = 0;
-    private double initialHeight = 190.0;
+    private double initialHeight = 200.0;
 
     // Matrix相关服务和数据
     private final MatrixService matrixService = new MatrixService();
@@ -126,9 +126,11 @@ public class HelloController implements Initializable {
 
     private static final double HISTOGRAM_CELL_WIDTH = 280.0;
     private static final double HISTOGRAM_MAX_BAR_WIDTH = 260.0;
-    private static final double HISTOGRAM_CANVAS_HEIGHT = 220.0; // 增加histogram显示区域高度
+//    private static final double HISTOGRAM_CANVAS_HEIGHT = 220.0; // 增加histogram显示区域高度
 
-    private static final double HISTOGRAM_FIXED_HEIGHT = 200.0; // 固定histogram高度为200
+    private static final double HISTOGRAM_FIXED_HEIGHT = 230.0; // 固定histogram高度为230
+
+    private static final int HISTOGRAM_LABEL_THRESHOLD = 15; // 超过15箱时不显示标注
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
@@ -149,6 +151,7 @@ public class HelloController implements Initializable {
 
             // 清空并重新构建Matrix容器
             matrixRowContainer.getChildren().clear();
+            matrixRowContainer.setAlignment(Pos.TOP_LEFT); // 设置容器左对齐
 
             // 为每一列创建Matrix组件
             List<String> headers = currentCsvData.getHeaders();
@@ -178,18 +181,18 @@ public class HelloController implements Initializable {
         cell.setPrefWidth(450.0);
         cell.setMinWidth(450.0);
         cell.setMaxWidth(450.0);
-        cell.setAlignment(Pos.TOP_CENTER);
+        cell.setAlignment(Pos.TOP_LEFT); // 改为左对齐
         cell.setStyle("-fx-padding: 5;");
 
-        // ===== 新增：添加列标题 =====
+        // ===== 添加列标题 =====
         Label columnLabel = new Label(columnName);
-        columnLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
-        columnLabel.setAlignment(Pos.CENTER);
+        columnLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        columnLabel.setAlignment(Pos.TOP_CENTER); // 标题左对齐
         cell.getChildren().add(columnLabel);
 
         // 创建水平布局，将控制器放在Canvas左侧
         HBox mainLayout = new HBox(10);
-        mainLayout.setAlignment(Pos.CENTER);
+        mainLayout.setAlignment(Pos.CENTER_LEFT); // 改为左对齐
 
         //创建Canvas
         Canvas canvas = new Canvas(MATRIX_SIZE, MATRIX_SIZE);
@@ -207,7 +210,6 @@ public class HelloController implements Initializable {
         // 分箱数量变化监听（现在canvas已经声明了）
         binSpinner.valueProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null && !newVal.equals(oldVal)) {
-//                System.out.println( " ========================================================= CC");
                 updateMatrixBinCount(columnName, newVal, canvas);
             }
         });
@@ -404,6 +406,8 @@ public class HelloController implements Initializable {
             histogramRowContainer.setAlignment(Pos.TOP_LEFT); // 设置容器左对齐
             histogramRowContainer.setSpacing(170.0); // 调整间距以匹配CSV列宽(450-280=170)
 
+            histogramRowContainer.setMaxHeight(230.0);
+
             List<String> headers = currentCsvData.getHeaders();
             for (String columnName : headers) {
                 Histogram histogram = currentHistograms.get(columnName);
@@ -435,7 +439,7 @@ public class HelloController implements Initializable {
 
         // 添加列标题
         Label columnLabel = new Label(columnName);
-        columnLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        columnLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
         columnLabel.setAlignment(Pos.CENTER_LEFT);
         cell.getChildren().add(columnLabel);
 
@@ -470,12 +474,15 @@ public class HelloController implements Initializable {
         double canvasWidth = canvas.getWidth();
         double canvasHeight = canvas.getHeight();
 
+        // 判断是否显示标注
+        boolean showLabels = binCount < HISTOGRAM_LABEL_THRESHOLD;
+
         // 动态计算每个bar的高度和间隙
         double topMargin = 5.0;
         double bottomMargin = 5.0;
         double availableHeight = canvasHeight - topMargin - bottomMargin;
 
-        // 间隙大小根据bin数量调整：bin越多，间隙越小
+        // 间隙大小根据bin数量调整
         double barSpacing;
         if (binCount <= 5) {
             barSpacing = 3.0;
@@ -487,11 +494,9 @@ public class HelloController implements Initializable {
             barSpacing = 1.0;
         }
 
-        // 计算bar高度：(总高度 - 所有间隙) / bin数量
+        // 计算bar高度
         double totalSpacing = (binCount - 1) * barSpacing;
         double barHeight = (availableHeight - totalSpacing) / binCount;
-
-        // 确保bar高度至少为1像素
         barHeight = Math.max(1.0, barHeight);
 
         // 找到最大频率用于缩放
@@ -500,26 +505,27 @@ public class HelloController implements Initializable {
                 .max()
                 .orElse(1);
 
-        // 留出左侧空间
-        double leftMargin = 10;
-        double maxBarWidth = Math.min(HISTOGRAM_MAX_BAR_WIDTH, canvasWidth - leftMargin - 10);
+        // 调整左侧边距以容纳bin标签
+        double leftMargin = showLabels ? 60 : 10; // 如果显示标注，左边距增加
+        double rightMargin = 15; // 右侧留出空间用于显示频率标注
+        double maxBarWidth = Math.min(HISTOGRAM_MAX_BAR_WIDTH, canvasWidth - leftMargin - rightMargin);
 
-        // 绘制每个bar（从上到下，横向延伸）
+        // 绘制每个bar
         double yPosition = topMargin;
         for (String binLabel : orderedValues) {
             Integer frequency = valueFrequency.get(binLabel);
             if (frequency == null) frequency = 0;
 
-            // 计算bar的宽度（从左往右画）
+            // 计算bar的宽度
             double barWidth = (frequency / (double) maxFrequency) * maxBarWidth;
 
-            // 设置颜色 - 使用纯白到纯黑的灰度
+            // 设置颜色
             double intensity = frequency / (double) maxFrequency;
             double grayLevel = 1.0 - intensity;
             Color barColor = Color.gray(grayLevel);
             gc.setFill(barColor);
 
-            // 绘制bar（从左边向右延伸）
+            // 绘制bar
             double barX = leftMargin;
             gc.fillRect(barX, yPosition, barWidth, barHeight);
 
@@ -528,31 +534,85 @@ public class HelloController implements Initializable {
             gc.setLineWidth(0.5);
             gc.strokeRect(barX, yPosition, barWidth, barHeight);
 
-            // 在bar内部显示频率（如果空间足够）
-            // 根据bar高度动态调整是否显示文字和字体大小
-            if (barWidth > 25 && barHeight > 8) {
-                if (intensity > 0.5) {
-                    gc.setFill(Color.WHITE);
-                } else {
-                    gc.setFill(Color.BLACK);
+            // === 新增：左侧显示bin范围标注 ===
+            if (showLabels && barHeight > 8) {
+                gc.setFill(Color.DARKGRAY);
+                double labelFontSize = Math.min(barHeight * 0.5, 9);
+                labelFontSize = Math.max(labelFontSize, 7);
+                gc.setFont(javafx.scene.text.Font.font(labelFontSize));
+
+                // 截断过长的bin标签
+                String displayLabel = binLabel;
+                if (displayLabel.length() > 10) {
+                    displayLabel = displayLabel.substring(0, 8) + "..";
                 }
 
+                // 左对齐显示bin标签
+                double labelX = 2;
+                double labelY = yPosition + barHeight / 2 + labelFontSize / 3;
+                gc.fillText(displayLabel, labelX, labelY);
+            }
+
+            // === 修改：根据bar宽度决定频率显示位置 ===
+            if (showLabels) {
+                // 定义"窄"的阈值：bar宽度小于50像素认为是窄的
+                double narrowBarThreshold = 50;
+                boolean isNarrowBar = barWidth < narrowBarThreshold;
+
                 // 动态调整字体大小
-                double fontSize = Math.min(barHeight * 0.6, 11);
-                fontSize = Math.max(fontSize, 7); // 最小字体7px
+                double fontSize = Math.min(barHeight * 0.6, 10);
+                fontSize = Math.max(fontSize, 7);
                 gc.setFont(javafx.scene.text.Font.font(fontSize));
 
                 String freqText = String.valueOf(frequency);
-                double textX = barX + 5;
-                double textY = yPosition + barHeight / 2 + fontSize / 3;
-                gc.fillText(freqText, textX, textY);
+
+                if (isNarrowBar || frequency == 0) {
+                    // === 窄bar或空值：在bar右侧显示频率 ===
+                    if (barHeight > 8) {
+                        gc.setFill(Color.DARKGRAY);
+                        double textX = barX + barWidth + 3; // bar右侧3像素处
+                        double textY = yPosition + barHeight / 2 + fontSize / 3;
+                        gc.fillText(freqText, textX, textY);
+                    }
+                } else {
+                    // === 宽bar：在bar内部显示频率 ===
+                    if (barWidth > 25 && barHeight > 8) {
+                        if (intensity > 0.5) {
+                            gc.setFill(Color.WHITE);
+                        } else {
+                            gc.setFill(Color.BLACK);
+                        }
+
+                        double textX = barX + 5;
+                        double textY = yPosition + barHeight / 2 + fontSize / 3;
+                        gc.fillText(freqText, textX, textY);
+                    }
+                }
+            } else {
+                // bin数量过多时，只在bar内部显示频率（如果空间够）
+                if (barWidth > 25 && barHeight > 8) {
+                    if (intensity > 0.5) {
+                        gc.setFill(Color.WHITE);
+                    } else {
+                        gc.setFill(Color.BLACK);
+                    }
+
+                    double fontSize = Math.min(barHeight * 0.6, 10);
+                    fontSize = Math.max(fontSize, 7);
+                    gc.setFont(javafx.scene.text.Font.font(fontSize));
+
+                    String freqText = String.valueOf(frequency);
+                    double textX = barX + 5;
+                    double textY = yPosition + barHeight / 2 + fontSize / 3;
+                    gc.fillText(freqText, textX, textY);
+                }
             }
 
-            // 为空值的bar添加斜线标记（只在bar高度足够时）
+            // 为空值的bar添加斜线标记
             if (frequency == 0 && barHeight > 5) {
                 gc.setStroke(Color.LIGHTGRAY);
                 gc.setLineWidth(1);
-                double slashLength = Math.min(20, barWidth);
+                double slashLength = Math.min(20, Math.max(barWidth, 10));
                 gc.strokeLine(barX, yPosition, barX + slashLength, yPosition + barHeight);
             }
 
@@ -590,9 +650,10 @@ public class HelloController implements Initializable {
         csvTableHeader.setOnMouseDragged(event -> {
             if (isDragging) {
                 double deltaY = dragStartY - event.getScreenY();
-                double newHeight = Math.max(100, Math.min(500, initialHeight + deltaY ));
-
+                // 调整最大高度，确保可以充分拖拽
+                double newHeight = Math.max(100, Math.min(800, initialHeight + deltaY));
                 csvTableContainer.setPrefHeight(newHeight);
+                csvTableContainer.setMaxHeight(newHeight);
             }
         });
 
@@ -665,6 +726,10 @@ public class HelloController implements Initializable {
         noDataLabel.setManaged(false);
         csvTableContainer.setVisible(true);
         csvTableContainer.setManaged(true);
+
+        // 重置表格高度和最大高度
+        csvTableContainer.setPrefHeight(190.0);
+        csvTableContainer.setMaxHeight(500.0); // 设置足够大的最大高度
 
         // 清空现有列
         csvTableView.getColumns().clear();
@@ -814,8 +879,10 @@ public class HelloController implements Initializable {
         csvTableContainer.setVisible(false);
         csvTableContainer.setManaged(false);
 
-        // 重置表格高度
+        // 重置表格高度和最大高度
         csvTableContainer.setPrefHeight(190.0);
+        csvTableContainer.setMaxHeight(Region.USE_COMPUTED_SIZE);
+
 
         System.out.println("所有数据已重置");
     }
