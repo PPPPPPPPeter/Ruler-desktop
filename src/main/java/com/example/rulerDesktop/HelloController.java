@@ -12,7 +12,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.geometry.Insets;
+
 import javafx.geometry.Pos;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
@@ -21,6 +21,7 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 import javafx.util.Duration;
+
 
 import java.io.File;
 import java.io.IOException;
@@ -122,6 +123,12 @@ public class HelloController implements Initializable {
     // 1. 添加成员变量
     private final HistogramService histogramService = new HistogramService();
     private Map<String, Histogram> currentHistograms; // 存储所有列的Histogram数据
+
+    private static final double HISTOGRAM_CELL_WIDTH = 280.0;
+    private static final double HISTOGRAM_MAX_BAR_WIDTH = 260.0;
+    private static final double HISTOGRAM_CANVAS_HEIGHT = 220.0; // 增加histogram显示区域高度
+
+    private static final double HISTOGRAM_FIXED_HEIGHT = 200.0; // 固定histogram高度为200
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
@@ -391,24 +398,21 @@ public class HelloController implements Initializable {
         }
 
         try {
-            // 使用HistogramService批量生成所有列的Histogram
-            currentHistograms = histogramService.generateAllHistograms(currentCsvData, 6); // 默认6个bins
+            currentHistograms = histogramService.generateAllHistograms(currentCsvData, 6);
 
-            // 清空并重新构建Histogram容器
             histogramRowContainer.getChildren().clear();
+            histogramRowContainer.setAlignment(Pos.TOP_LEFT); // 设置容器左对齐
+            histogramRowContainer.setSpacing(170.0); // 调整间距以匹配CSV列宽(450-280=170)
 
-            // 为每一列创建Histogram组件
             List<String> headers = currentCsvData.getHeaders();
             for (String columnName : headers) {
                 Histogram histogram = currentHistograms.get(columnName);
                 if (histogram != null) {
                     VBox histogramCell = createHistogramCell(histogram, columnName);
-//                    HBox.setMargin(histogramCell, new Insets(0, 40, 0, 0)); // 左右各40px间隙，可调整
                     histogramRowContainer.getChildren().add(histogramCell);
                 }
             }
 
-            // 显示Histogram容器
             histogramRowContainer.setVisible(true);
             histogramRowContainer.setManaged(true);
 
@@ -423,23 +427,20 @@ public class HelloController implements Initializable {
     // 4. 创建单个Histogram单元格组件
     private VBox createHistogramCell(Histogram histogram, String columnName) {
         VBox cell = new VBox(5);
-        cell.setPrefWidth(450.0);
-        cell.setMinWidth(450.0);
-        cell.setMaxWidth(450.0);
-        cell.setAlignment(Pos.TOP_CENTER);
+        cell.setPrefWidth(HISTOGRAM_CELL_WIDTH);
+        cell.setMinWidth(HISTOGRAM_CELL_WIDTH);
+        cell.setMaxWidth(HISTOGRAM_CELL_WIDTH);
+        cell.setAlignment(Pos.TOP_LEFT);
         cell.setStyle("-fx-padding: 5; -fx-background-color: #f8f9fa;");
 
         // 添加列标题
         Label columnLabel = new Label(columnName);
         columnLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
-        columnLabel.setAlignment(Pos.CENTER);
+        columnLabel.setAlignment(Pos.CENTER_LEFT);
         cell.getChildren().add(columnLabel);
 
-        // 创建Histogram的Canvas - 调整为横向布局
-        // 高度根据bin数量动态调整，每个bar高度约15px
-        int binCount = histogram.getOrderedValues().size();
-        double canvasHeight = Math.max(200, binCount * 15 + 10); // 至少100px，每个bin 15px + 留10px边距
-        Canvas canvas = new Canvas(450, canvasHeight);
+        // 创建固定高度的Canvas
+        Canvas canvas = new Canvas(HISTOGRAM_CELL_WIDTH, HISTOGRAM_FIXED_HEIGHT);
         renderHistogramToCanvas(canvas, histogram);
 
         // 将Canvas添加到单元格
@@ -449,6 +450,7 @@ public class HelloController implements Initializable {
     }
 
     // 5. 渲染Histogram到Canvas（横向布局，纯白到纯黑）
+
     private void renderHistogramToCanvas(Canvas canvas, Histogram histogram) {
         if (histogram == null) {
             return;
@@ -468,9 +470,29 @@ public class HelloController implements Initializable {
         double canvasWidth = canvas.getWidth();
         double canvasHeight = canvas.getHeight();
 
-        // 计算每个bar的高度（留出间隙）
-        double barSpacing = 1.0;
-        double barHeight = (canvasHeight - (binCount - 1) * barSpacing) / binCount;
+        // 动态计算每个bar的高度和间隙
+        double topMargin = 5.0;
+        double bottomMargin = 5.0;
+        double availableHeight = canvasHeight - topMargin - bottomMargin;
+
+        // 间隙大小根据bin数量调整：bin越多，间隙越小
+        double barSpacing;
+        if (binCount <= 5) {
+            barSpacing = 3.0;
+        } else if (binCount <= 10) {
+            barSpacing = 2.0;
+        } else if (binCount <= 20) {
+            barSpacing = 1.5;
+        } else {
+            barSpacing = 1.0;
+        }
+
+        // 计算bar高度：(总高度 - 所有间隙) / bin数量
+        double totalSpacing = (binCount - 1) * barSpacing;
+        double barHeight = (availableHeight - totalSpacing) / binCount;
+
+        // 确保bar高度至少为1像素
+        barHeight = Math.max(1.0, barHeight);
 
         // 找到最大频率用于缩放
         int maxFrequency = valueFrequency.values().stream()
@@ -478,12 +500,12 @@ public class HelloController implements Initializable {
                 .max()
                 .orElse(1);
 
-        // 留出左侧空间用于显示bin标签（如果需要）
-        double leftMargin = 5;
-        double maxBarWidth = canvasWidth - leftMargin - 5; // 右侧留5px边距
+        // 留出左侧空间
+        double leftMargin = 10;
+        double maxBarWidth = Math.min(HISTOGRAM_MAX_BAR_WIDTH, canvasWidth - leftMargin - 10);
 
         // 绘制每个bar（从上到下，横向延伸）
-        double yPosition = 0;
+        double yPosition = topMargin;
         for (String binLabel : orderedValues) {
             Integer frequency = valueFrequency.get(binLabel);
             if (frequency == null) frequency = 0;
@@ -492,9 +514,8 @@ public class HelloController implements Initializable {
             double barWidth = (frequency / (double) maxFrequency) * maxBarWidth;
 
             // 设置颜色 - 使用纯白到纯黑的灰度
-            // 频率越高，颜色越黑（grayLevel越小）
             double intensity = frequency / (double) maxFrequency;
-            double grayLevel = 1.0 - intensity; // 1.0=白色，0.0=黑色
+            double grayLevel = 1.0 - intensity;
             Color barColor = Color.gray(grayLevel);
             gc.setFill(barColor);
 
@@ -508,27 +529,31 @@ public class HelloController implements Initializable {
             gc.strokeRect(barX, yPosition, barWidth, barHeight);
 
             // 在bar内部显示频率（如果空间足够）
-            if (barWidth > 30 && barHeight > 10) {
-                // 根据背景颜色选择文字颜色
+            // 根据bar高度动态调整是否显示文字和字体大小
+            if (barWidth > 25 && barHeight > 8) {
                 if (intensity > 0.5) {
-                    gc.setFill(Color.WHITE); // 深色背景用白字
+                    gc.setFill(Color.WHITE);
                 } else {
-                    gc.setFill(Color.BLACK); // 浅色背景用黑字
+                    gc.setFill(Color.BLACK);
                 }
 
-                gc.setFont(javafx.scene.text.Font.font(Math.min(barHeight * 0.6, 10)));
+                // 动态调整字体大小
+                double fontSize = Math.min(barHeight * 0.6, 11);
+                fontSize = Math.max(fontSize, 7); // 最小字体7px
+                gc.setFont(javafx.scene.text.Font.font(fontSize));
+
                 String freqText = String.valueOf(frequency);
-                double textWidth = freqText.length() * 6;
-                double textX = barX + 5; // 左对齐，留5px边距
-                double textY = yPosition + barHeight / 2 + 3; // 垂直居中
+                double textX = barX + 5;
+                double textY = yPosition + barHeight / 2 + fontSize / 3;
                 gc.fillText(freqText, textX, textY);
             }
 
-            // 为空值的bar添加斜线标记
-            if (frequency == 0 && barHeight > 8) {
+            // 为空值的bar添加斜线标记（只在bar高度足够时）
+            if (frequency == 0 && barHeight > 5) {
                 gc.setStroke(Color.LIGHTGRAY);
                 gc.setLineWidth(1);
-                gc.strokeLine(barX, yPosition, barX + 20, yPosition + barHeight);
+                double slashLength = Math.min(20, barWidth);
+                gc.strokeLine(barX, yPosition, barX + slashLength, yPosition + barHeight);
             }
 
             yPosition += barHeight + barSpacing;
@@ -537,7 +562,7 @@ public class HelloController implements Initializable {
         // 绘制左侧基线
         gc.setStroke(Color.BLACK);
         gc.setLineWidth(2);
-        gc.strokeLine(leftMargin, 0, leftMargin, canvasHeight);
+        gc.strokeLine(leftMargin, topMargin, leftMargin, yPosition - barSpacing);
     }
 
     private void setupCsvTable() {
@@ -565,7 +590,8 @@ public class HelloController implements Initializable {
         csvTableHeader.setOnMouseDragged(event -> {
             if (isDragging) {
                 double deltaY = dragStartY - event.getScreenY();
-                double newHeight = Math.max(100, Math.min(500, initialHeight + deltaY));
+                double newHeight = Math.max(100, Math.min(500, initialHeight + deltaY ));
+
                 csvTableContainer.setPrefHeight(newHeight);
             }
         });
